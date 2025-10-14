@@ -13,7 +13,7 @@ def create_app(config_class=Config):
     # Initialize extensions
     db.init_app(app)
     socketio.init_app(app, cors_allowed_origins="*", manage_session=False)
-    cors.init_app(app)
+    cors.init_app(app, origins="*", supports_credentials=True)
     migrate.init_app(app, db)
     
     # Register blueprints
@@ -30,5 +30,14 @@ def create_app(config_class=Config):
     # Register socket handlers
     from .socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
+    
+    # Add health check endpoint
+    @app.route('/health')
+    def health_check():
+        return {'status': 'healthy', 'message': 'CollabCanvas API is running'}, 200
+    
+    @app.route('/')
+    def root():
+        return {'message': 'CollabCanvas API', 'version': '1.0.0'}, 200
     
     return app
