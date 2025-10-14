@@ -18,7 +18,7 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  console.log('Making API request to:', config.baseURL + config.url)
+  console.log('Making API request to:', (config.baseURL || '') + (config.url || ''))
   return config
 })
 

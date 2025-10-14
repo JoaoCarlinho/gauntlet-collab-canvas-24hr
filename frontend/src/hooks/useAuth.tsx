@@ -51,7 +51,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAuthenticated(true)
         } catch (registerError) {
           console.error('Registration failed:', registerError)
-          throw new Error('Failed to register user: ' + registerError.message)
+          const errorMessage = registerError instanceof Error ? registerError.message : 'Unknown registration error'
+          throw new Error('Failed to register user: ' + errorMessage)
         }
       }
       
@@ -61,11 +62,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Provide more specific error messages
       let errorMessage = 'Failed to sign in'
-      if (error.message.includes('Failed to register user')) {
+      const errorString = error instanceof Error ? error.message : String(error)
+      
+      if (errorString.includes('Failed to register user')) {
         errorMessage = 'Failed to create user account'
-      } else if (error.message.includes('404')) {
+      } else if (errorString.includes('404')) {
         errorMessage = 'Server connection failed. Please check your internet connection.'
-      } else if (error.message.includes('Network Error')) {
+      } else if (errorString.includes('Network Error')) {
         errorMessage = 'Network error. Please try again.'
       }
       
