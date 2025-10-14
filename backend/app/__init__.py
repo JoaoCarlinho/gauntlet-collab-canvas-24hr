@@ -13,8 +13,17 @@ def create_app(config_class=Config):
     
     # Initialize extensions
     db.init_app(app)
-    socketio.init_app(app, cors_allowed_origins="*", manage_session=False)
-    cors.init_app(app, origins="*", supports_credentials=True)
+    
+    # Configure CORS for production
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:5173", 
+        "https://gauntlet-collab-canvas-24hr.vercel.app",
+        "https://*.vercel.app"
+    ]
+    
+    socketio.init_app(app, cors_allowed_origins=allowed_origins, manage_session=False)
+    cors.init_app(app, origins=allowed_origins, supports_credentials=True)
     migrate.init_app(app, db)
     
     # Initialize Swagger
