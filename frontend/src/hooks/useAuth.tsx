@@ -35,13 +35,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store token
       localStorage.setItem('idToken', idToken)
       
-      // Register user with backend
-      await authAPI.register(idToken)
-      
-      // Get user data
-      const response = await authAPI.getCurrentUser()
-      setUser(response.user)
-      setIsAuthenticated(true)
+      // Try to get user data first, if not found, register them
+      try {
+        const response = await authAPI.getCurrentUser()
+        setUser(response.user)
+        setIsAuthenticated(true)
+      } catch (error) {
+        // If user doesn't exist, register them
+        console.log('User not found, registering...')
+        const registerResponse = await authAPI.register(idToken)
+        setUser(registerResponse.user)
+        setIsAuthenticated(true)
+      }
       
       toast.success('Successfully signed in!')
     } catch (error) {
