@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_socketio import SocketIO
 from flask_cors import CORS
 from flask_migrate import Migrate
+from flasgger import Swagger
 from .config import Config
 from .extensions import db, socketio, cors, migrate
 
@@ -15,6 +16,53 @@ def create_app(config_class=Config):
     socketio.init_app(app, cors_allowed_origins="*", manage_session=False)
     cors.init_app(app, origins="*", supports_credentials=True)
     migrate.init_app(app, db)
+    
+    # Initialize Swagger
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": 'apispec_1',
+                "route": '/apispec_1.json',
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/docs"
+    }
+    
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "CollabCanvas API",
+            "description": "Real-time collaborative canvas API",
+            "version": "1.0.0",
+            "contact": {
+                "name": "CollabCanvas Team",
+                "email": "support@collabcanvas.com"
+            }
+        },
+        "host": "localhost:5000",
+        "basePath": "/api",
+        "schemes": ["http", "https"],
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "Firebase ID token in format: Bearer <token>"
+            }
+        },
+        "security": [
+            {
+                "Bearer": []
+            }
+        ]
+    }
+    
+    swagger = Swagger(app, config=swagger_config, template=swagger_template)
     
     # Register blueprints
     from .routes.auth import auth_bp

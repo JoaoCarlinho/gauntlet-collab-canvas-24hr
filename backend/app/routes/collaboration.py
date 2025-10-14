@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flasgger import swag_from
 from app.services.collaboration_service import CollaborationService
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
@@ -9,6 +10,81 @@ canvas_service = CanvasService()
 
 @collaboration_bp.route('/invite', methods=['POST'])
 @require_auth
+@swag_from({
+    'tags': ['Collaboration'],
+    'summary': 'Invite a user to collaborate on a canvas',
+    'description': 'Send an invitation to a user to collaborate on a canvas with specified permissions',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'canvas_id': {
+                        'type': 'string',
+                        'description': 'ID of the canvas to invite user to'
+                    },
+                    'invitee_email': {
+                        'type': 'string',
+                        'format': 'email',
+                        'description': 'Email address of the user to invite'
+                    },
+                    'permission_type': {
+                        'type': 'string',
+                        'enum': ['view', 'edit'],
+                        'description': 'Permission level to grant (view or edit)'
+                    }
+                },
+                'required': ['canvas_id', 'invitee_email']
+            }
+        }
+    ],
+    'responses': {
+        201: {
+            'description': 'Invitation sent successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string'},
+                    'invitation': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'canvas_id': {'type': 'string'},
+                            'inviter_id': {'type': 'string'},
+                            'invitee_email': {'type': 'string'},
+                            'permission_type': {'type': 'string'},
+                            'status': {'type': 'string'},
+                            'expires_at': {'type': 'string'},
+                            'created_at': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - missing required fields or invalid permission type',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        403: {
+            'description': 'Access denied - only canvas owner can invite users',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def invite_user(current_user):
     """Invite a user to collaborate on a canvas."""
     try:
