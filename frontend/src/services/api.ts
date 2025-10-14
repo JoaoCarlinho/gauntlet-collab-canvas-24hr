@@ -1,13 +1,15 @@
 import axios from 'axios'
 import { User, Canvas, CanvasObject, Invitation } from '../types'
+import { getApiUrl } from '../utils/env'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = getApiUrl()
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 })
 
 // Add auth token to requests
@@ -16,8 +18,32 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  console.log('Making API request to:', config.baseURL + config.url)
   return config
 })
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => {
+    console.log('API response received:', response.status, response.config.url)
+    return response
+  },
+  (error) => {
+    console.error('API request failed:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    })
+    
+    // Handle specific error cases
+    if (error.response?.status === 404) {
+      console.error('404 Error - Check if API URL is correct:', API_URL)
+    }
+    
+    return Promise.reject(error)
+  }
+)
 
 // Auth API
 export const authAPI = {

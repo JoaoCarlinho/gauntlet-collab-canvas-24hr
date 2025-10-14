@@ -37,21 +37,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       // Try to get user data first, if not found, register them
       try {
+        console.log('Attempting to get current user...')
         const response = await authAPI.getCurrentUser()
+        console.log('User found:', response.user)
         setUser(response.user)
         setIsAuthenticated(true)
       } catch (error) {
-        // If user doesn't exist, register them
-        console.log('User not found, registering...')
-        const registerResponse = await authAPI.register(idToken)
-        setUser(registerResponse.user)
-        setIsAuthenticated(true)
+        console.log('User not found, attempting to register...', error)
+        try {
+          const registerResponse = await authAPI.register(idToken)
+          console.log('User registered successfully:', registerResponse.user)
+          setUser(registerResponse.user)
+          setIsAuthenticated(true)
+        } catch (registerError) {
+          console.error('Registration failed:', registerError)
+          throw new Error('Failed to register user: ' + registerError.message)
+        }
       }
       
       toast.success('Successfully signed in!')
     } catch (error) {
       console.error('Sign in error:', error)
-      toast.error('Failed to sign in')
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to sign in'
+      if (error.message.includes('Failed to register user')) {
+        errorMessage = 'Failed to create user account'
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Server connection failed. Please check your internet connection.'
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = 'Network error. Please try again.'
+      }
+      
+      toast.error(errorMessage)
       throw error
     } finally {
       setIsLoading(false)
