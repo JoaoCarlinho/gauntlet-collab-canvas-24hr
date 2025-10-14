@@ -64,60 +64,54 @@ A real-time collaborative canvas application built with React, Flask, and Socket
    ```
    
    **⚠️ Important:** Replace all placeholder values with your actual configuration:
-   - `VITE_API_URL`: Your deployed backend URL (e.g., `https://collabcanvas-backend-123.herokuapp.com`)
+   - `VITE_API_URL`: Your deployed Railway backend URL (e.g., `https://your-app-name-production.up.railway.app`)
    - Firebase values: Get these from your Firebase project settings
 
 3. **Deploy:**
    - Vercel will auto-deploy on git push
    - Custom domain can be configured in Vercel dashboard
 
-### Backend (Heroku)
+### Backend (Railway) - Recommended
 
-1. **Install Heroku CLI:**
-   ```bash
-   # macOS
-   brew tap heroku/brew && brew install heroku
-   
-   # Or download from https://devcenter.heroku.com/articles/heroku-cli
+1. **Connect to Railway:**
+   - Go to [railway.app](https://railway.app)
+   - Sign up with your GitHub account
+   - Connect your GitHub repository
+
+2. **Deploy Backend:**
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+   - Select the `collabcanvas-mvp-24/backend` folder
+
+3. **Add PostgreSQL:**
+   - In your project dashboard, click "New"
+   - Select "Database" → "PostgreSQL"
+   - Railway will automatically connect it to your app
+
+4. **Set Environment Variables:**
+   In Railway dashboard, go to your backend service → Variables tab:
+   ```
+   SECRET_KEY=your-secret-key-here
+   FLASK_ENV=production
+   PORT=5000
+   FIREBASE_PROJECT_ID=your-project-id
+   FIREBASE_PRIVATE_KEY_ID=your-private-key-id
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour-Private-Key\n-----END PRIVATE KEY-----"
+   FIREBASE_CLIENT_EMAIL=your-client-email@your-project.iam.gserviceaccount.com
+   FIREBASE_CLIENT_ID=your-client-id
+   FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
+   FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
+   FIREBASE_AUTH_PROVIDER_X509_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+   FIREBASE_CLIENT_X509_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/your-client-email%40your-project.iam.gserviceaccount.com
    ```
 
-2. **Create Heroku app:**
-   ```bash
-   cd backend
-   heroku create your-app-name
-   ```
-   
-   **Note:** Choose a unique app name as it becomes your public URL: `https://your-app-name.herokuapp.com`
+5. **Verify Deployment:**
+   - Railway will auto-deploy on git push
+   - Your app will be available at: `https://your-app-name-production.up.railway.app`
+   - Test health endpoint: `https://your-app-name-production.up.railway.app/health`
 
-3. **Add PostgreSQL addon:**
-   ```bash
-   heroku addons:create heroku-postgresql:mini
-   ```
-
-4. **Set environment variables:**
-   ```bash
-   heroku config:set SECRET_KEY=your-secret-key
-   heroku config:set FIREBASE_PROJECT_ID=your-project-id
-   heroku config:set FIREBASE_PRIVATE_KEY_ID=your-private-key-id
-   heroku config:set FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour-Private-Key\n-----END PRIVATE KEY-----"
-   heroku config:set FIREBASE_CLIENT_EMAIL=your-client-email
-   heroku config:set FIREBASE_CLIENT_ID=your-client-id
-   heroku config:set FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
-   heroku config:set FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
-   ```
-
-5. **Deploy:**
-   ```bash
-   git subtree push --prefix=backend heroku main
-   ```
-
-6. **Verify Deployment:**
-   ```bash
-   heroku open
-   # Your app will be available at: https://your-app-name.herokuapp.com
-   ```
-
-### Alternative Backend Hosting (Railway)
+### Alternative Backend Hosting (Heroku)
 
 1. **Connect to Railway:**
    - Go to [railway.app](https://railway.app)
@@ -143,6 +137,8 @@ A real-time collaborative canvas application built with React, Flask, and Socket
 SECRET_KEY=your-secret-key-here
 DATABASE_URL=postgresql://user:pass@localhost/dbname
 REDIS_URL=redis://localhost:6379/0
+FLASK_ENV=development
+PORT=5000
 FIREBASE_PROJECT_ID=your-project-id
 FIREBASE_PRIVATE_KEY_ID=your-private-key-id
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour-Private-Key\n-----END PRIVATE KEY-----"
@@ -150,6 +146,8 @@ FIREBASE_CLIENT_EMAIL=your-client-email
 FIREBASE_CLIENT_ID=your-client-id
 FIREBASE_AUTH_URI=https://accounts.google.com/o/oauth2/auth
 FIREBASE_TOKEN_URI=https://oauth2.googleapis.com/token
+FIREBASE_AUTH_PROVIDER_X509_CERT_URL=https://www.googleapis.com/oauth2/v1/certs
+FIREBASE_CLIENT_X509_CERT_URL=https://www.googleapis.com/robot/v1/metadata/x509/your-client-email%40your-project.iam.gserviceaccount.com
 ```
 
 **Frontend (.env.local):**
@@ -162,6 +160,50 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 ```
+
+**Production Frontend (Vercel):**
+```env
+VITE_API_URL=https://your-app-name-production.up.railway.app
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+## 📚 API Documentation
+
+The backend API is fully documented with Swagger UI:
+
+- **Swagger UI**: `https://your-railway-app.up.railway.app/docs`
+- **API Spec**: `https://your-railway-app.up.railway.app/apispec_1.json`
+
+### Available Endpoints:
+
+**Authentication:**
+- `POST /api/auth/register` - Register new user
+- `GET /api/auth/me` - Get current user info
+- `POST /api/auth/verify` - Verify Firebase token
+
+**Canvas Management:**
+- `GET /api/canvas/` - Get all user canvases
+- `POST /api/canvas/` - Create new canvas
+- `GET /api/canvas/{id}` - Get specific canvas
+- `PUT /api/canvas/{id}` - Update canvas
+- `DELETE /api/canvas/{id}` - Delete canvas
+
+**Object Management:**
+- `POST /api/objects/` - Create canvas object
+- `GET /api/objects/{id}` - Get object details
+- `PUT /api/objects/{id}` - Update object
+- `DELETE /api/objects/{id}` - Delete object
+
+**Collaboration:**
+- `POST /api/collaboration/invite` - Invite user to canvas
+- `GET /api/collaboration/invitations` - Get user invitations
+- `POST /api/collaboration/invitations/{id}/accept` - Accept invitation
+- `POST /api/collaboration/invitations/{id}/decline` - Decline invitation
 
 ## 🧪 Testing
 
