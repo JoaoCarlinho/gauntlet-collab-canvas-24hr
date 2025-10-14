@@ -19,7 +19,8 @@ def create_app(config_class=Config):
         "http://localhost:3000",
         "http://localhost:5173", 
         "https://gauntlet-collab-canvas-24hr.vercel.app",
-        "https://*.vercel.app"
+        "https://*.vercel.app",
+        "https://*.onrender.com"
     ]
     
     socketio.init_app(app, cors_allowed_origins=allowed_origins, manage_session=False)

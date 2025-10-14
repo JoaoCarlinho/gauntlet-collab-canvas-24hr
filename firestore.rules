@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can read and write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Canvases
+    match /canvases/{canvasId} {
+      // Owner can read and write
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.owner_id;
+      // Public canvases can be read by anyone
+      allow read: if resource.data.is_public == true;
+      // Users with permissions can read
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/canvas_permissions/$(request.auth.uid + '_' + canvasId));
+    }
+    
+    // Canvas objects
+    match /canvas_objects/{objectId} {
+      // Users can read objects if they have access to the canvas
+      allow read: if request.auth != null && 
+        (exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+         (get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid ||
+          get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.is_public == true ||
+          exists(/databases/$(database)/documents/canvas_permissions/$(request.auth.uid + '_' + resource.data.canvas_id))));
+      
+      // Users can write objects if they have edit access to the canvas
+      allow write: if request.auth != null && 
+        (exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+         (get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid ||
+          (exists(/databases/$(database)/documents/canvas_permissions/$(request.auth.uid + '_' + resource.data.canvas_id)) &&
+           get(/databases/$(database)/documents/canvas_permissions/$(request.auth.uid + '_' + resource.data.canvas_id)).data.permission_type == 'edit')));
+    }
+    
+    // Canvas permissions
+    match /canvas_permissions/{permissionId} {
+      // Users can read their own permissions
+      allow read: if request.auth != null && request.auth.uid == resource.data.user_id;
+      // Canvas owner can read all permissions for their canvas
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+        get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid;
+      // Canvas owner can write permissions
+      allow write: if request.auth != null && 
+        exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+        get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid;
+    }
+    
+    // Invitations
+    match /invitations/{invitationId} {
+      // Users can read invitations sent to their email
+      allow read: if request.auth != null && request.auth.token.email == resource.data.invitee_email;
+      // Canvas owner can read invitations for their canvas
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+        get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid;
+      // Canvas owner can write invitations
+      allow write: if request.auth != null && 
+        exists(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)) &&
+        get(/databases/$(database)/documents/canvases/$(resource.data.canvas_id)).data.owner_id == request.auth.uid;
+    }
+  }
+}
