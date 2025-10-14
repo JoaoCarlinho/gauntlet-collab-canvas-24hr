@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flasgger import swag_from
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
 import json
@@ -8,6 +9,92 @@ canvas_service = CanvasService()
 
 @objects_bp.route('/', methods=['POST'])
 @require_auth
+@swag_from({
+    'tags': ['Objects'],
+    'summary': 'Create a new canvas object',
+    'description': 'Create a new object (rectangle, circle, or text) on a canvas',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'canvas_id': {
+                        'type': 'string',
+                        'description': 'ID of the canvas to add the object to'
+                    },
+                    'object_type': {
+                        'type': 'string',
+                        'enum': ['rectangle', 'circle', 'text'],
+                        'description': 'Type of object to create'
+                    },
+                    'properties': {
+                        'type': 'object',
+                        'description': 'Object properties (position, size, color, etc.)',
+                        'properties': {
+                            'x': {'type': 'number', 'description': 'X coordinate'},
+                            'y': {'type': 'number', 'description': 'Y coordinate'},
+                            'width': {'type': 'number', 'description': 'Width (for rectangle)'},
+                            'height': {'type': 'number', 'description': 'Height (for rectangle)'},
+                            'radius': {'type': 'number', 'description': 'Radius (for circle)'},
+                            'text': {'type': 'string', 'description': 'Text content (for text)'},
+                            'fill': {'type': 'string', 'description': 'Fill color'},
+                            'stroke': {'type': 'string', 'description': 'Stroke color'},
+                            'strokeWidth': {'type': 'number', 'description': 'Stroke width'},
+                            'fontSize': {'type': 'number', 'description': 'Font size (for text)'},
+                            'fontFamily': {'type': 'string', 'description': 'Font family (for text)'}
+                        }
+                    }
+                },
+                'required': ['canvas_id', 'object_type', 'properties']
+            }
+        }
+    ],
+    'responses': {
+        201: {
+            'description': 'Object created successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string'},
+                    'object': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'canvas_id': {'type': 'string'},
+                            'object_type': {'type': 'string'},
+                            'properties': {'type': 'object'},
+                            'created_by': {'type': 'string'},
+                            'created_at': {'type': 'string'},
+                            'updated_at': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - missing required fields or invalid object type',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        403: {
+            'description': 'Access denied - insufficient permissions',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def create_object(current_user):
     """Create a new canvas object."""
     try:

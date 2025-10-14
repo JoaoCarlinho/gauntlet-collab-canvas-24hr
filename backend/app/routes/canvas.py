@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flasgger import swag_from
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
 
@@ -7,6 +8,48 @@ canvas_service = CanvasService()
 
 @canvas_bp.route('/', methods=['GET'])
 @require_auth
+@swag_from({
+    'tags': ['Canvas'],
+    'summary': 'Get all canvases',
+    'description': 'Get all canvases accessible to the current user (owned, shared, or public)',
+    'security': [{'Bearer': []}],
+    'responses': {
+        200: {
+            'description': 'Canvases retrieved successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'canvases': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'id': {'type': 'string'},
+                                'title': {'type': 'string'},
+                                'description': {'type': 'string'},
+                                'owner_id': {'type': 'string'},
+                                'is_public': {'type': 'boolean'},
+                                'created_at': {'type': 'string'},
+                                'updated_at': {'type': 'string'},
+                                'object_count': {'type': 'integer'},
+                                'collaborator_count': {'type': 'integer'}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - invalid or missing token',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_canvases(current_user):
     """Get all canvases accessible to the current user."""
     try:
@@ -19,6 +62,78 @@ def get_canvases(current_user):
 
 @canvas_bp.route('/', methods=['POST'])
 @require_auth
+@swag_from({
+    'tags': ['Canvas'],
+    'summary': 'Create a new canvas',
+    'description': 'Create a new canvas owned by the current user',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'title': {
+                        'type': 'string',
+                        'description': 'Canvas title'
+                    },
+                    'description': {
+                        'type': 'string',
+                        'description': 'Canvas description (optional)'
+                    },
+                    'is_public': {
+                        'type': 'boolean',
+                        'description': 'Whether the canvas is public (optional, default: false)'
+                    }
+                },
+                'required': ['title']
+            }
+        }
+    ],
+    'responses': {
+        201: {
+            'description': 'Canvas created successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'message': {'type': 'string'},
+                    'canvas': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'title': {'type': 'string'},
+                            'description': {'type': 'string'},
+                            'owner_id': {'type': 'string'},
+                            'is_public': {'type': 'boolean'},
+                            'created_at': {'type': 'string'},
+                            'updated_at': {'type': 'string'}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            'description': 'Bad request - missing required fields',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        401: {
+            'description': 'Unauthorized - invalid or missing token',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def create_canvas(current_user):
     """Create a new canvas."""
     try:
@@ -47,6 +162,63 @@ def create_canvas(current_user):
 
 @canvas_bp.route('/<canvas_id>', methods=['GET'])
 @require_auth
+@swag_from({
+    'tags': ['Canvas'],
+    'summary': 'Get a specific canvas',
+    'description': 'Get details of a specific canvas by ID',
+    'security': [{'Bearer': []}],
+    'parameters': [
+        {
+            'name': 'canvas_id',
+            'in': 'path',
+            'type': 'string',
+            'required': True,
+            'description': 'Canvas ID'
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Canvas retrieved successfully',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'canvas': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'title': {'type': 'string'},
+                            'description': {'type': 'string'},
+                            'owner_id': {'type': 'string'},
+                            'is_public': {'type': 'boolean'},
+                            'created_at': {'type': 'string'},
+                            'updated_at': {'type': 'string'},
+                            'object_count': {'type': 'integer'},
+                            'collaborator_count': {'type': 'integer'}
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            'description': 'Access denied - insufficient permissions',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        },
+        404: {
+            'description': 'Canvas not found',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'error': {'type': 'string'}
+                }
+            }
+        }
+    }
+})
 def get_canvas(current_user, canvas_id):
     """Get a specific canvas."""
     try:
