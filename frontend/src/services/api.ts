@@ -1,0 +1,134 @@
+import axios from 'axios'
+import { User, Canvas, CanvasObject, Invitation } from '../types'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+
+const api = axios.create({
+  baseURL: `${API_URL}/api`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('idToken')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
+// Auth API
+export const authAPI = {
+  register: async (idToken: string) => {
+    const response = await api.post('/auth/register', { idToken })
+    return response.data
+  },
+  
+  getCurrentUser: async (): Promise<{ user: User }> => {
+    const response = await api.get('/auth/me')
+    return response.data
+  },
+  
+  verifyToken: async (idToken: string) => {
+    const response = await api.post('/auth/verify', { idToken })
+    return response.data
+  },
+}
+
+// Canvas API
+export const canvasAPI = {
+  getCanvases: async (): Promise<{ canvases: Canvas[] }> => {
+    const response = await api.get('/canvas')
+    return response.data
+  },
+  
+  createCanvas: async (data: { title: string; description?: string; is_public?: boolean }): Promise<{ canvas: Canvas }> => {
+    const response = await api.post('/canvas', data)
+    return response.data
+  },
+  
+  getCanvas: async (canvasId: string): Promise<{ canvas: Canvas }> => {
+    const response = await api.get(`/canvas/${canvasId}`)
+    return response.data
+  },
+  
+  updateCanvas: async (canvasId: string, data: Partial<Canvas>): Promise<{ canvas: Canvas }> => {
+    const response = await api.put(`/canvas/${canvasId}`, data)
+    return response.data
+  },
+  
+  deleteCanvas: async (canvasId: string): Promise<void> => {
+    await api.delete(`/canvas/${canvasId}`)
+  },
+  
+  getCanvasObjects: async (canvasId: string): Promise<{ objects: CanvasObject[] }> => {
+    const response = await api.get(`/canvas/${canvasId}/objects`)
+    return response.data
+  },
+}
+
+// Objects API
+export const objectsAPI = {
+  createObject: async (data: { canvas_id: string; object_type: string; properties: Record<string, any> }): Promise<{ object: CanvasObject }> => {
+    const response = await api.post('/objects', data)
+    return response.data
+  },
+  
+  getObject: async (objectId: string): Promise<{ object: CanvasObject }> => {
+    const response = await api.get(`/objects/${objectId}`)
+    return response.data
+  },
+  
+  updateObject: async (objectId: string, data: { properties: Record<string, any> }): Promise<{ object: CanvasObject }> => {
+    const response = await api.put(`/objects/${objectId}`, data)
+    return response.data
+  },
+  
+  deleteObject: async (objectId: string): Promise<void> => {
+    await api.delete(`/objects/${objectId}`)
+  },
+}
+
+// Collaboration API
+export const collaborationAPI = {
+  inviteUser: async (data: { canvas_id: string; invitee_email: string; permission_type: 'view' | 'edit' }): Promise<{ invitation: Invitation }> => {
+    const response = await api.post('/collaboration/invite', data)
+    return response.data
+  },
+  
+  getInvitations: async (): Promise<{ invitations: Invitation[] }> => {
+    const response = await api.get('/collaboration/invitations')
+    return response.data
+  },
+  
+  acceptInvitation: async (invitationId: string): Promise<{ permission: any }> => {
+    const response = await api.post(`/collaboration/invitations/${invitationId}/accept`)
+    return response.data
+  },
+  
+  declineInvitation: async (invitationId: string): Promise<{ invitation: Invitation }> => {
+    const response = await api.post(`/collaboration/invitations/${invitationId}/decline`)
+    return response.data
+  },
+  
+  getCollaborators: async (canvasId: string): Promise<{ collaborators: any[] }> => {
+    const response = await api.get(`/collaboration/canvas/${canvasId}/collaborators`)
+    return response.data
+  },
+  
+  updateCollaboratorPermission: async (canvasId: string, userId: string, permissionType: 'view' | 'edit'): Promise<{ permission: any }> => {
+    const response = await api.put(`/collaboration/canvas/${canvasId}/collaborators/${userId}`, { permission_type: permissionType })
+    return response.data
+  },
+  
+  removeCollaborator: async (canvasId: string, userId: string): Promise<void> => {
+    await api.delete(`/collaboration/canvas/${canvasId}/collaborators/${userId}`)
+  },
+  
+  getCanvasInvitations: async (canvasId: string): Promise<{ invitations: Invitation[] }> => {
+    const response = await api.get(`/collaboration/canvas/${canvasId}/invitations`)
+    return response.data
+  },
+}
