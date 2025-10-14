@@ -62,6 +62,10 @@ A real-time collaborative canvas application built with React, Flask, and Socket
    VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    VITE_FIREBASE_APP_ID=your_app_id
    ```
+   
+   **⚠️ Important:** Replace all placeholder values with your actual configuration:
+   - `VITE_API_URL`: Your deployed backend URL (e.g., `https://collabcanvas-backend-123.herokuapp.com`)
+   - Firebase values: Get these from your Firebase project settings
 
 3. **Deploy:**
    - Vercel will auto-deploy on git push
@@ -82,6 +86,8 @@ A real-time collaborative canvas application built with React, Flask, and Socket
    cd backend
    heroku create your-app-name
    ```
+   
+   **Note:** Choose a unique app name as it becomes your public URL: `https://your-app-name.herokuapp.com`
 
 3. **Add PostgreSQL addon:**
    ```bash
@@ -103,6 +109,12 @@ A real-time collaborative canvas application built with React, Flask, and Socket
 5. **Deploy:**
    ```bash
    git subtree push --prefix=backend heroku main
+   ```
+
+6. **Verify Deployment:**
+   ```bash
+   heroku open
+   # Your app will be available at: https://your-app-name.herokuapp.com
    ```
 
 ### Alternative Backend Hosting (Railway)
