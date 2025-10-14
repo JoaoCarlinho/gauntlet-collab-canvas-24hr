@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client'
-import { CursorData, OnlineUser, CanvasObject } from '../types'
+import { CursorData } from '../types'
 
 class SocketService {
   private socket: Socket | null = null

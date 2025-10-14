@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Stage, Layer, Rect, Circle, Text } from 'react-konva'
-import { ArrowLeft, Users, Settings, Save } from 'lucide-react'
+import { ArrowLeft, Users, Settings } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
@@ -116,7 +116,7 @@ const CanvasPage: React.FC = () => {
     })
 
     socketService.on('user_left', (data: { user_name: string }) => {
-      toast.info(`${data.user_name} left the canvas`)
+      toast(`${data.user_name} left the canvas`)
     })
 
     socketService.on('online_users', (data: { users: OnlineUser[] }) => {
@@ -144,7 +144,7 @@ const CanvasPage: React.FC = () => {
           stroke: '#1d4ed8',
           strokeWidth: 2
         },
-        created_by: user!.id
+        created_by: user?.id || ''
       }
       setNewObject(rect)
       setIsDrawing(true)
@@ -161,7 +161,7 @@ const CanvasPage: React.FC = () => {
           stroke: '#059669',
           strokeWidth: 2
         },
-        created_by: user!.id
+        created_by: user?.id || ''
       }
       setNewObject(circle)
       setIsDrawing(true)
@@ -178,7 +178,7 @@ const CanvasPage: React.FC = () => {
           fill: '#374151',
           fontFamily: 'Arial'
         },
-        created_by: user!.id
+        created_by: user?.id || ''
       }
       setNewObject(text)
       setIsDrawing(true)
@@ -199,20 +199,20 @@ const CanvasPage: React.FC = () => {
       setNewObject(prev => ({
         ...prev,
         properties: {
-          ...prev!.properties,
-          width: Math.max(10, point.x - prev!.properties.x),
-          height: Math.max(10, point.y - prev!.properties.y)
+          ...prev!.properties!,
+          width: Math.max(10, point.x - prev!.properties!.x),
+          height: Math.max(10, point.y - prev!.properties!.y)
         }
       }))
     } else if (newObject.object_type === 'circle') {
       const radius = Math.sqrt(
-        Math.pow(point.x - newObject.properties.x, 2) + 
-        Math.pow(point.y - newObject.properties.y, 2)
+        Math.pow(point.x - newObject.properties!.x, 2) + 
+        Math.pow(point.y - newObject.properties!.y, 2)
       )
       setNewObject(prev => ({
         ...prev,
         properties: {
-          ...prev!.properties,
+          ...prev!.properties!,
           radius: Math.max(10, radius)
         }
       }))
