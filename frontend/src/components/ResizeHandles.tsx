@@ -1,18 +1,26 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Rect, Group } from 'react-konva'
 import { CanvasObject } from '../types'
+import { CursorState, getCursorManager } from '../utils/cursorManager'
 
 interface ResizeHandlesProps {
   object: CanvasObject
   isSelected: boolean
   onResize: (objectId: string, newProperties: any) => void
+  onCursorChange?: (cursor: CursorState) => void
+  onCursorReset?: () => void
 }
 
 const ResizeHandles: React.FC<ResizeHandlesProps> = ({
   object,
   isSelected,
-  onResize
+  onResize,
+  onCursorChange,
+  onCursorReset
 }) => {
+  const [hoveredHandle, setHoveredHandle] = useState<string | null>(null)
+  const cursorManager = getCursorManager()
+
   if (!isSelected) return null
 
   const props = object.properties
@@ -55,6 +63,33 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
           { x: props.x + textWidth - handleOffset, y: props.y - handleOffset, cursor: 'e-resize', type: 'e' },
           { x: props.x + textWidth - handleOffset, y: props.y + textHeight - handleOffset, cursor: 'e-resize', type: 'e' }
         ]
+      case 'heart':
+      case 'star':
+      case 'diamond':
+        // Shape objects with 8 handles (same as rectangle)
+        return [
+          // Corner handles
+          { x: props.x - handleOffset, y: props.y - handleOffset, cursor: 'nw-resize', type: 'nw' },
+          { x: props.x + props.width - handleOffset, y: props.y - handleOffset, cursor: 'ne-resize', type: 'ne' },
+          { x: props.x - handleOffset, y: props.y + props.height - handleOffset, cursor: 'sw-resize', type: 'sw' },
+          { x: props.x + props.width - handleOffset, y: props.y + props.height - handleOffset, cursor: 'se-resize', type: 'se' },
+          // Edge handles
+          { x: props.x + props.width/2 - handleOffset, y: props.y - handleOffset, cursor: 'n-resize', type: 'n' },
+          { x: props.x + props.width/2 - handleOffset, y: props.y + props.height - handleOffset, cursor: 's-resize', type: 's' },
+          { x: props.x - handleOffset, y: props.y + props.height/2 - handleOffset, cursor: 'w-resize', type: 'w' },
+          { x: props.x + props.width - handleOffset, y: props.y + props.height/2 - handleOffset, cursor: 'e-resize', type: 'e' }
+        ]
+      case 'line':
+      case 'arrow':
+        // Line objects with start and end point handles
+        const startX = props.x
+        const startY = props.y
+        const endX = props.x + (props.points?.[2] || 100)
+        const endY = props.y + (props.points?.[3] || 0)
+        return [
+          { x: startX - handleOffset, y: startY - handleOffset, cursor: 'move', type: 'start' },
+          { x: endX - handleOffset, y: endY - handleOffset, cursor: 'move', type: 'end' }
+        ]
       default:
         return []
     }
@@ -74,6 +109,15 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
         break
       case 'text':
         handleTextResize(newProperties, handleType, deltaX, deltaY)
+        break
+      case 'heart':
+      case 'star':
+      case 'diamond':
+        handleShapeResize(newProperties, handleType, deltaX, deltaY)
+        break
+      case 'line':
+      case 'arrow':
+        handleLineResize(newProperties, handleType, deltaX, deltaY)
         break
     }
 
@@ -160,24 +204,111 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
     }
   }
 
+  const handleShapeResize = (props: any, handleType: string, deltaX: number, deltaY: number) => {
+    const minSize = 20
+
+    switch (handleType) {
+      case 'nw': // Top-left
+        props.x += deltaX
+        props.y += deltaY
+        props.width = Math.max(minSize, props.width - deltaX)
+        props.height = Math.max(minSize, props.height - deltaY)
+        break
+      case 'ne': // Top-right
+        props.y += deltaY
+        props.width = Math.max(minSize, props.width + deltaX)
+        props.height = Math.max(minSize, props.height - deltaY)
+        break
+      case 'sw': // Bottom-left
+        props.x += deltaX
+        props.width = Math.max(minSize, props.width - deltaX)
+        props.height = Math.max(minSize, props.height + deltaY)
+        break
+      case 'se': // Bottom-right
+        props.width = Math.max(minSize, props.width + deltaX)
+        props.height = Math.max(minSize, props.height + deltaY)
+        break
+      case 'n': // Top edge
+        props.y += deltaY
+        props.height = Math.max(minSize, props.height - deltaY)
+        break
+      case 's': // Bottom edge
+        props.height = Math.max(minSize, props.height + deltaY)
+        break
+      case 'w': // Left edge
+        props.x += deltaX
+        props.width = Math.max(minSize, props.width - deltaX)
+        break
+      case 'e': // Right edge
+        props.width = Math.max(minSize, props.width + deltaX)
+        break
+    }
+  }
+
+  const handleLineResize = (props: any, handleType: string, deltaX: number, deltaY: number) => {
+    if (!props.points || props.points.length < 4) {
+      props.points = [0, 0, 100, 0]
+    }
+
+    switch (handleType) {
+      case 'start': // Start point
+        props.points[0] += deltaX
+        props.points[1] += deltaY
+        break
+      case 'end': // End point
+        props.points[2] += deltaX
+        props.points[3] += deltaY
+        break
+    }
+  }
+
+  const handleMouseEnter = (handleType: string) => {
+    setHoveredHandle(handleType)
+    const cursor = cursorManager.getCursorForHandle(handleType)
+    cursorManager.setCursor(cursor)
+    onCursorChange?.(cursor)
+  }
+
+  const handleMouseLeave = () => {
+    setHoveredHandle(null)
+    cursorManager.resetCursor()
+    onCursorReset?.()
+  }
+
+  const getHandleStyle = (handleType: string) => {
+    const isHovered = hoveredHandle === handleType
+    return {
+      fill: isHovered ? '#1d4ed8' : '#3b82f6',
+      stroke: '#fff',
+      strokeWidth: 1,
+      opacity: isHovered ? 1 : 0.8
+    }
+  }
+
   return (
     <Group>
-      {getHandles().map((handle, index) => (
-        <Rect
-          key={index}
-          x={handle.x}
-          y={handle.y}
-          width={handleSize}
-          height={handleSize}
-          fill="#3b82f6"
-          stroke="#fff"
-          strokeWidth={1}
-          draggable={true}
-          onDragMove={(e) => handleResize(e, handle.type)}
-          onDragEnd={(e) => handleResize(e, handle.type)}
-          style={{ cursor: handle.cursor }}
-        />
-      ))}
+      {getHandles().map((handle, index) => {
+        const style = getHandleStyle(handle.type)
+        return (
+          <Rect
+            key={index}
+            x={handle.x}
+            y={handle.y}
+            width={handleSize}
+            height={handleSize}
+            fill={style.fill}
+            stroke={style.stroke}
+            strokeWidth={style.strokeWidth}
+            opacity={style.opacity}
+            draggable={true}
+            onDragMove={(e) => handleResize(e, handle.type)}
+            onDragEnd={(e) => handleResize(e, handle.type)}
+            onMouseEnter={() => handleMouseEnter(handle.type)}
+            onMouseLeave={handleMouseLeave}
+            style={{ cursor: handle.cursor }}
+          />
+        )
+      })}
     </Group>
   )
 }
