@@ -151,13 +151,13 @@ const ZoomableCanvas: React.FC<ZoomableCanvasProps> = ({
 
   // Touch event handlers
   const handleTouchStartEvent = useCallback((e: TouchEvent) => {
-    handleTouchStart(e, startPan, (centerX, centerY, distance) => {
+    handleTouchStart(e, startPan, () => {
       // Pinch start - could add visual feedback here
     })
   }, [handleTouchStart, startPan])
 
   const handleTouchMoveEvent = useCallback((e: TouchEvent) => {
-    handleTouchMove(e, updatePan, (centerX, centerY, distance, scale) => {
+    handleTouchMove(e, updatePan, (centerX, centerY, scale) => {
       // Pinch zoom
       const newScale = Math.max(
         finalConfig.limits.minScale,

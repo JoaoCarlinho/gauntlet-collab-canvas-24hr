@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 
 export interface ZoomState {
   scale: number
@@ -37,8 +37,6 @@ export const useCanvasZoom = (config: Partial<ZoomConfig> = {}) => {
   
   const [isPanning, setIsPanning] = useState(false)
   const [lastPointerPosition, setLastPointerPosition] = useState({ x: 0, y: 0 })
-  
-  const animationRef = useRef<number>()
 
   // Zoom in
   const zoomIn = useCallback((centerX?: number, centerY?: number) => {
