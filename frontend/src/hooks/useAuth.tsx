@@ -15,6 +15,7 @@ interface AuthContextType extends AuthState {
   signIn: () => Promise<void>
   signOut: () => Promise<void>
   refreshUser: () => Promise<void>
+  checkAuthState: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -107,10 +108,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async () => {
     try {
+      console.log('=== Starting sign-in process ===')
       setIsLoading(true)
+      
+      console.log('Calling signInWithGoogle...')
       const firebaseUser = await signInWithGoogle()
-      await processUserAuthentication(firebaseUser)
+      console.log('Firebase user received:', firebaseUser ? 'User object received' : 'No user object')
+      
+      if (firebaseUser) {
+        console.log('User details:', {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName
+        })
+        
+        console.log('Processing user authentication...')
+        await processUserAuthentication(firebaseUser)
+        console.log('=== Sign-in process completed successfully ===')
+      } else {
+        console.error('No Firebase user received from signInWithGoogle')
+        throw new Error('No user received from authentication')
+      }
     } catch (error) {
+      console.error('=== Sign-in process failed ===')
       console.error('Sign in error:', error)
       
       // Handle different types of errors
@@ -169,9 +189,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = async () => {
     try {
+      console.log('=== Refreshing user data ===')
       const response = await authAPI.getCurrentUser()
       setUser(response.user)
       setIsAuthenticated(true)
+      console.log('User data refreshed successfully')
     } catch (error) {
       console.error('Failed to refresh user:', error)
       setUser(null)
@@ -179,30 +201,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }
 
+  const checkAuthState = () => {
+    console.log('=== Manual auth state check ===')
+    console.log('Current Firebase user:', auth.currentUser ? 'Present' : 'Null')
+    console.log('Local storage token:', localStorage.getItem('idToken') ? 'Present' : 'Missing')
+    console.log('React state - user:', user)
+    console.log('React state - isAuthenticated:', isAuthenticated)
+    console.log('React state - isLoading:', isLoading)
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      console.log('Firebase auth state changed:', firebaseUser ? 'User signed in' : 'User signed out')
+      console.log('=== Firebase auth state changed ===')
+      console.log('Firebase user:', firebaseUser ? 'Present' : 'Null')
       
       if (firebaseUser) {
+        console.log('User details from Firebase:', {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          emailVerified: firebaseUser.emailVerified
+        })
+        
         try {
+          console.log('Getting Firebase ID token...')
           const idToken = await firebaseUser.getIdToken()
+          console.log('ID token received, length:', idToken.length)
           localStorage.setItem('idToken', idToken)
           
-          // Get user data from backend
+          console.log('Calling backend API to get user data...')
           const response = await authAPI.getCurrentUser()
+          console.log('Backend user data received:', response.user)
+          
           setUser(response.user)
           setIsAuthenticated(true)
-          console.log('User authenticated successfully')
+          console.log('=== User authenticated successfully ===')
         } catch (error) {
-          console.error('Failed to get user data:', error)
+          console.error('=== Failed to get user data from backend ===')
+          console.error('Error details:', error)
           setUser(null)
           setIsAuthenticated(false)
         }
       } else {
+        console.log('No Firebase user - clearing auth state')
         localStorage.removeItem('idToken')
         setUser(null)
         setIsAuthenticated(false)
-        console.log('User signed out')
+        console.log('=== User signed out ===')
       }
       setIsLoading(false)
     })
@@ -217,6 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     signIn,
     signOut,
     refreshUser,
+    checkAuthState,
   }
 
   return (
