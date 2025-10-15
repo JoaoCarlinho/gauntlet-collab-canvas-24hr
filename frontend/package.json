@@ -54,7 +54,9 @@
     "test:object-creation-fix": "cypress run --spec 'cypress/e2e/object-creation-state-fix.cy.ts' --config-file cypress.config.local-dev.ts",
     "test:object-creation-fix:open": "cypress open --spec 'cypress/e2e/object-creation-state-fix.cy.ts' --config-file cypress.config.local-dev.ts",
     "test:enhanced-interactions": "cypress run --spec 'cypress/e2e/enhanced-object-interactions.cy.ts' --config-file cypress.config.local-dev.ts",
-    "test:enhanced-interactions:open": "cypress open --spec 'cypress/e2e/enhanced-object-interactions.cy.ts' --config-file cypress.config.local-dev.ts"
+    "test:enhanced-interactions:open": "cypress open --spec 'cypress/e2e/enhanced-object-interactions.cy.ts' --config-file cypress.config.local-dev.ts",
+    "test:cursor-tooltips": "cypress run --spec 'cypress/e2e/cursor-tooltips.cy.ts' --config-file cypress.config.local-dev.ts",
+    "test:cursor-tooltips:open": "cypress open --spec 'cypress/e2e/cursor-tooltips.cy.ts' --config-file cypress.config.local-dev.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

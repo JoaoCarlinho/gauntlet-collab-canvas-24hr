@@ -17,6 +17,8 @@ import ZoomableCanvas from './ZoomableCanvas'
 import EditableText from './EditableText'
 import ResizeHandles from './ResizeHandles'
 import SelectionIndicator from './SelectionIndicator'
+import CursorTooltip from './CursorTooltip'
+import { getUserColor, getUserInitials, getCursorIcon } from '../utils/cursorUtils'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -39,6 +41,11 @@ const CanvasPage: React.FC = () => {
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
   const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  
+  // Cursor tooltip state
+  const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [showTooltip, setShowTooltip] = useState(false)
   
   const idToken = localStorage.getItem('idToken')
 
@@ -189,6 +196,24 @@ const CanvasPage: React.FC = () => {
     if (idToken) {
       await socketService.updateObject(canvasId!, idToken, objectId, { x, y })
     }
+  }
+
+  // Cursor tooltip handlers
+  const handleCursorHover = (cursor: CursorData, event: any) => {
+    const stage = event.target.getStage()
+    const pointerPosition = stage.getPointerPosition()
+    
+    setHoveredCursor(cursor)
+    setTooltipPosition({
+      x: pointerPosition.x,
+      y: pointerPosition.y
+    })
+    setShowTooltip(true)
+  }
+
+  const handleCursorLeave = () => {
+    setShowTooltip(false)
+    setHoveredCursor(null)
   }
 
   const handleStageClick = (e: any) => {
@@ -441,17 +466,53 @@ const CanvasPage: React.FC = () => {
   }
 
   const renderCursors = () => {
-    return cursors.map((cursor) => (
-      <Text
-        key={cursor.user_id}
-        x={cursor.position.x}
-        y={cursor.position.y - 20}
-        text={`👆 ${cursor.user_name}`}
-        fontSize={12}
-        fill="#3b82f6"
-        fontFamily="Arial"
-      />
-    ))
+    return cursors.map((cursor) => {
+      const userColor = getUserColor(cursor.user_id)
+      const userInitials = getUserInitials(cursor.user_name)
+      const cursorIcon = getCursorIcon(cursor.user_id)
+      
+      return (
+        <Group
+          key={cursor.user_id}
+          x={cursor.position.x}
+          y={cursor.position.y}
+          onMouseEnter={(e) => handleCursorHover(cursor, e)}
+          onMouseLeave={handleCursorLeave}
+        >
+          {/* Cursor pointer icon */}
+          <Text
+            x={-8}
+            y={-8}
+            text={cursorIcon}
+            fontSize={16}
+            fill={userColor}
+            fontFamily="Arial"
+          />
+          
+          {/* User avatar circle */}
+          <Circle
+            x={0}
+            y={0}
+            radius={12}
+            fill={userColor}
+            stroke="#fff"
+            strokeWidth={2}
+            opacity={0.9}
+          />
+          
+          {/* User initials */}
+          <Text
+            x={-4}
+            y={-4}
+            text={userInitials}
+            fontSize={8}
+            fill="#fff"
+            fontFamily="Arial"
+            fontStyle="bold"
+          />
+        </Group>
+      )
+    })
   }
 
   if (isLoading) {
@@ -648,6 +709,16 @@ const CanvasPage: React.FC = () => {
           onClose={() => setShowInviteModal(false)}
           canvasId={canvasId!}
           canvasTitle={canvas.title}
+        />
+      )}
+
+      {/* Cursor Tooltip */}
+      {hoveredCursor && (
+        <CursorTooltip
+          cursor={hoveredCursor}
+          position={tooltipPosition}
+          isVisible={showTooltip}
+          onClose={handleCursorLeave}
         />
       )}
     </div>
