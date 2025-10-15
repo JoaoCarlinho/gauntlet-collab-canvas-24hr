@@ -30,26 +30,28 @@ class AuthService:
                     print(f"Private key contains \\n: {'\\n' in private_key_raw}")
                     print(f"Private key contains actual newlines: {'\n' in private_key_raw}")
                 
+                # Fix private key formatting - replace escaped newlines with actual newlines
+                private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '')
+                if private_key:
+                    # Replace escaped newlines with actual newlines
+                    private_key = private_key.replace('\\n', '\n')
+                    # Ensure proper PEM format
+                    if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
+                        private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
+                    if not private_key.endswith('-----END PRIVATE KEY-----\n'):
+                        if private_key.endswith('-----END PRIVATE KEY-----'):
+                            private_key += '\n'
+                        else:
+                            private_key += '\n-----END PRIVATE KEY-----\n'
+                    
+                    print(f"Private key after formatting - contains actual newlines: {'\n' in private_key}")
+                
                 # Check if Firebase is already initialized
                 try:
                     firebase_admin.get_app()
                     print("Firebase already initialized")
                 except ValueError:
                     # Initialize Firebase with service account
-                    # Fix private key formatting - replace escaped newlines with actual newlines
-                    private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '')
-                    if private_key:
-                        # Replace escaped newlines with actual newlines
-                        private_key = private_key.replace('\\n', '\n')
-                        # Ensure proper PEM format
-                        if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
-                            private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
-                        if not private_key.endswith('-----END PRIVATE KEY-----\n'):
-                            if private_key.endswith('-----END PRIVATE KEY-----'):
-                                private_key += '\n'
-                            else:
-                                private_key += '\n-----END PRIVATE KEY-----\n'
-                    
                     firebase_config = {
                         "type": "service_account",
                         "project_id": os.environ.get('FIREBASE_PROJECT_ID'),
@@ -101,9 +103,13 @@ class AuthService:
                     raise Exception('Invalid token')
             else:
                 from firebase_admin import auth
+                print(f"Verifying token, length: {len(id_token)}")
+                print(f"Token starts with: {id_token[:50]}...")
                 decoded_token = auth.verify_id_token(id_token)
+                print(f"Token verified successfully for user: {decoded_token.get('uid', 'unknown')}")
                 return decoded_token
         except Exception as e:
+            print(f"Token verification failed: {str(e)}")
             raise Exception(f"Invalid token: {str(e)}")
     
     def register_user(self, id_token):
