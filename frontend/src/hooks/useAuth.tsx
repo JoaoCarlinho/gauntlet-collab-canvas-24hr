@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error instanceof AuthenticationError) {
         // Handle redirect in progress
         if (error.code === 'redirect-in-progress') {
-          toast.info('Redirecting to sign-in page...')
+          toast('Redirecting to sign-in page...', { icon: 'ℹ️' })
           return // Don't show error for redirect
         }
         
