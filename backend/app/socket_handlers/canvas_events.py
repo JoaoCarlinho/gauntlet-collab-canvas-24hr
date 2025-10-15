@@ -117,10 +117,10 @@ def register_canvas_handlers(socketio):
                 created_by=user.id
             )
             
-            # Broadcast to all users in the canvas room
+            # Broadcast to all users in the canvas room (including the creator)
             emit('object_created', {
                 'object': canvas_object.to_dict()
-            }, room=canvas_id, include_self=False)
+            }, room=canvas_id, include_self=True)
             
         except Exception as e:
             emit('error', {'message': str(e)})
@@ -160,10 +160,10 @@ def register_canvas_handlers(socketio):
             )
             
             if updated_object:
-                # Broadcast to all users in the canvas room
+                # Broadcast to all users in the canvas room (including the updater)
                 emit('object_updated', {
                     'object': updated_object.to_dict()
-                }, room=canvas_id, include_self=False)
+                }, room=canvas_id, include_self=True)
             
         except Exception as e:
             emit('error', {'message': str(e)})
@@ -199,10 +199,10 @@ def register_canvas_handlers(socketio):
             success = canvas_service.delete_canvas_object(object_id)
             
             if success:
-                # Broadcast to all users in the canvas room
+                # Broadcast to all users in the canvas room (including the deleter)
                 emit('object_deleted', {
                     'object_id': object_id
-                }, room=canvas_id, include_self=False)
+                }, room=canvas_id, include_self=True)
             
         except Exception as e:
             emit('error', {'message': str(e)})
