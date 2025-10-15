@@ -122,14 +122,32 @@ export const signInWithGoogleRedirect = async (): Promise<void> => {
 export const getGoogleRedirectResult = async (): Promise<User | null> => {
   try {
     console.log('Checking for redirect result...')
-    const result = await getRedirectResult(auth)
+    
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      setTimeout(() => reject(new Error('Redirect result check timeout')), 5000)
+    })
+    
+    const result = await Promise.race([
+      getRedirectResult(auth),
+      timeoutPromise
+    ])
+    
     if (result) {
       console.log('Google sign-in successful via redirect')
       return result.user
     }
+    
+    console.log('No redirect result found')
     return null
   } catch (error) {
     console.error('Error getting redirect result:', error)
+    
+    // Don't throw errors for timeout or no redirect result
+    if (error instanceof Error && error.message === 'Redirect result check timeout') {
+      console.log('Redirect result check timed out - no redirect in progress')
+      return null
+    }
     
     if (error instanceof Error && 'code' in error) {
       const authError = error as AuthError

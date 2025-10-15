@@ -32,20 +32,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
-  // Handle redirect result on app initialization
+  // Handle redirect result on app initialization (only if user came from redirect)
   useEffect(() => {
     const handleRedirectResult = async () => {
+      // Only check for redirect result if we're in a redirect flow
+      const urlParams = new URLSearchParams(window.location.search)
+      const isRedirectFlow = urlParams.has('code') || urlParams.has('state') || 
+                           window.location.pathname.includes('auth') ||
+                           document.referrer.includes('accounts.google.com')
+      
+      if (!isRedirectFlow) {
+        console.log('Not a redirect flow - skipping redirect result check')
+        setIsLoading(false)
+        return
+      }
+
       try {
+        console.log('Checking for redirect result (redirect flow detected)...')
         const redirectUser = await getGoogleRedirectResult()
         if (redirectUser) {
           console.log('Processing redirect result...')
           await processUserAuthentication(redirectUser)
+        } else {
+          console.log('No redirect result found')
         }
       } catch (error) {
         console.error('Error processing redirect result:', error)
         if (error instanceof AuthenticationError) {
           toast.error(error.message)
         }
+      } finally {
+        // Ensure loading state is cleared even if redirect check fails
+        setIsLoading(false)
       }
     }
 
@@ -163,6 +181,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      console.log('Firebase auth state changed:', firebaseUser ? 'User signed in' : 'User signed out')
+      
       if (firebaseUser) {
         try {
           const idToken = await firebaseUser.getIdToken()
@@ -172,6 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const response = await authAPI.getCurrentUser()
           setUser(response.user)
           setIsAuthenticated(true)
+          console.log('User authenticated successfully')
         } catch (error) {
           console.error('Failed to get user data:', error)
           setUser(null)
@@ -181,6 +202,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.removeItem('idToken')
         setUser(null)
         setIsAuthenticated(false)
+        console.log('User signed out')
       }
       setIsLoading(false)
     })
