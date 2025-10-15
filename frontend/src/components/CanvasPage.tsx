@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Stage, Layer, Rect, Circle, Text } from 'react-konva'
-import { ArrowLeft, Users, Settings, UserPlus, X } from 'lucide-react'
+import { ArrowLeft, Users, Settings, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
@@ -9,7 +9,6 @@ import { socketService } from '../services/socket'
 import { Canvas, CanvasObject, CursorData, OnlineUser } from '../types'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
-import CollaboratorManagement from './CollaboratorManagement'
 import PresenceIndicators from './PresenceIndicators'
 import UserStatus from './UserStatus'
 import CollaborationSidebar from './CollaborationSidebar'
@@ -24,7 +23,6 @@ const CanvasPage: React.FC = () => {
   const [canvas, setCanvas] = useState<Canvas | null>(null)
   const [objects, setObjects] = useState<CanvasObject[]>([])
   const [cursors, setCursors] = useState<CursorData[]>([])
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTool, setSelectedTool] = useState<'select' | 'rectangle' | 'circle' | 'text'>('select')
   const [isDrawing, setIsDrawing] = useState(false)
