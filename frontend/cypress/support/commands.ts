@@ -18,6 +18,8 @@ declare global {
       mockWebSocket(): Chainable<void>
       mockFirebaseAuth(): Chainable<void>
       waitForCanvasLoad(): Chainable<void>
+      addObjectToCanvas(objectType: string, x: number, y: number): Chainable<void>
+      verifyObjectVisible(objectIndex: number): Chainable<void>
     }
   }
 }
@@ -96,4 +98,30 @@ Cypress.Commands.add('waitForCanvasLoad', () => {
   cy.get('[data-testid="canvas-editor"]').should('be.visible')
   cy.get('[data-testid="canvas-tools"]').should('be.visible')
   cy.get('[data-testid="connection-status"]').should('be.visible')
+})
+
+Cypress.Commands.add('addObjectToCanvas', (objectType: string, x: number, y: number) => {
+  // Click the appropriate button based on object type
+  switch (objectType.toLowerCase()) {
+    case 'text':
+      cy.get('[data-testid="add-text-button"]').click()
+      break
+    case 'rectangle':
+      cy.get('[data-testid="add-rectangle-button"]').click()
+      break
+    case 'circle':
+      cy.get('[data-testid="add-circle-button"]').click()
+      break
+    default:
+      throw new Error(`Unknown object type: ${objectType}`)
+  }
+  
+  // Click on canvas at specified coordinates
+  cy.get('[data-testid="canvas-area"]').click(x, y)
+})
+
+Cypress.Commands.add('verifyObjectVisible', (objectIndex: number) => {
+  // Verify the object is immediately visible
+  cy.get('[data-testid="canvas-object"]').eq(objectIndex).should('be.visible')
+  cy.get('[data-testid="canvas-object"]').eq(objectIndex).should('have.css', 'pointer-events', 'auto')
 })

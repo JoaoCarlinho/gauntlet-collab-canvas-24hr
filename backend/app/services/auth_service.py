@@ -18,25 +18,24 @@ class AuthService:
                 import firebase_admin
                 from firebase_admin import auth, credentials
                 
+                # Check if Firebase is already initialized
+                try:
+                    existing_app = firebase_admin.get_app()
+                    print("Firebase app already exists, using existing app")
+                    return  # Use existing app instead of reinitializing
+                except ValueError:
+                    print("No existing Firebase app found, initializing new app")
+                
                 # Debug: Check Firebase environment variables
                 print("=== Firebase Initialization Debug ===")
                 print(f"FIREBASE_PROJECT_ID: {'SET' if os.environ.get('FIREBASE_PROJECT_ID') else 'NOT SET'}")
                 print(f"FIREBASE_CLIENT_EMAIL: {'SET' if os.environ.get('FIREBASE_CLIENT_EMAIL') else 'NOT SET'}")
                 private_key_raw = os.environ.get('FIREBASE_PRIVATE_KEY', '')
                 print(f"FIREBASE_PRIVATE_KEY: {'SET' if private_key_raw else 'NOT SET'}")
-                if private_key_raw:
-                    print(f"Private key length: {len(private_key_raw)}")
-                    print(f"Private key starts with: {private_key_raw[:50]}...")
-                    print(f"Private key contains \\n: {'\\n' in private_key_raw}")
-                    print(f"Private key contains actual newlines: {'\n' in private_key_raw}")
                 
                 # Fix private key formatting - replace escaped newlines with actual newlines
                 private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '')
                 if private_key:
-                    print(f"Original private key length: {len(private_key)}")
-                    print(f"Original private key contains \\n: {'\\n' in private_key}")
-                    print(f"Original private key contains actual newlines: {'\n' in private_key}")
-                    
                     # Replace escaped newlines with actual newlines
                     private_key = private_key.replace('\\n', '\n')
                     
@@ -48,20 +47,6 @@ class AuthService:
                             private_key += '\n'
                         else:
                             private_key += '\n-----END PRIVATE KEY-----\n'
-                    
-                    print(f"Formatted private key length: {len(private_key)}")
-                    print(f"Formatted private key contains actual newlines: {'\n' in private_key}")
-                    print(f"Formatted private key starts with: {private_key[:50]}...")
-                    print(f"Formatted private key ends with: ...{private_key[-50:]}")
-                
-                # Force reinitialize Firebase with properly formatted private key
-                try:
-                    # Delete existing app if it exists
-                    existing_app = firebase_admin.get_app()
-                    firebase_admin.delete_app(existing_app)
-                    print("Deleted existing Firebase app to reinitialize")
-                except ValueError:
-                    print("No existing Firebase app found")
                 
                 # Initialize Firebase with service account
                 firebase_config = {

@@ -2,7 +2,7 @@ import { defineConfig } from 'cypress'
 
 export default defineConfig({
   e2e: {
-    baseUrl: 'https://gauntlet-collab-canvas-24hr.vercel.app',
+    baseUrl: 'http://localhost:3002',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     viewportWidth: 1280,
@@ -10,20 +10,14 @@ export default defineConfig({
     video: false,
     screenshotOnRunFailure: true,
     screenshotsFolder: 'cypress/screenshots',
-    screenshotOnRunFailure: true,
-    defaultScreenshotOptions: {
-      capture: 'fullPage',
-      clip: null,
-      disableTimersAndAnimations: false
-    },
     defaultCommandTimeout: 10000,
     requestTimeout: 10000,
     responseTimeout: 10000,
     pageLoadTimeout: 30000,
-    // Environment variables for testing
+    // Environment variables for local testing
     env: {
-      API_URL: 'https://gauntlet-collab-canvas-24hr-production.up.railway.app',
-      MOCK_AUTH: false,
+      API_URL: 'http://localhost:5000',
+      MOCK_AUTH: true,
       MOCK_WEBSOCKET: false
     },
     setupNodeEvents(on, config) {
@@ -32,8 +26,8 @@ export default defineConfig({
         log(message) {
           console.log(message)
           return null
-        }
+        },
       })
-    }
-  }
+    },
+  },
 })
