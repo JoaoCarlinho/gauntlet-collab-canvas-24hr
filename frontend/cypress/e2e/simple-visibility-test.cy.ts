@@ -85,3 +85,4 @@ describe('Simple Object Visibility Test', () => {
     cy.screenshot('11-root-exists')
   })
 })
+

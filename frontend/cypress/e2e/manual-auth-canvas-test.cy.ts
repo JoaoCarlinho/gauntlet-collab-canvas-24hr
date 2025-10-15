@@ -166,3 +166,4 @@ describe('Manual Authentication Canvas Test', () => {
     })
   })
 })
+

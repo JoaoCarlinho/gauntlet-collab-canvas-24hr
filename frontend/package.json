@@ -48,7 +48,11 @@
     "test:canvas-screenshots": "cypress run --spec 'cypress/e2e/canvas-screenshots.cy.ts' --config-file cypress.config.minimal.ts",
     "test:manual-canvas": "cypress open --config-file cypress.config.minimal.ts",
     "test:canvas-deletion": "cypress run --spec 'cypress/e2e/canvas-deletion.cy.ts' --config-file cypress.config.local-dev.ts",
-    "test:canvas-deletion:open": "cypress open --spec 'cypress/e2e/canvas-deletion.cy.ts' --config-file cypress.config.local-dev.ts"
+    "test:canvas-deletion:open": "cypress open --spec 'cypress/e2e/canvas-deletion.cy.ts' --config-file cypress.config.local-dev.ts",
+    "test:production": "cypress run --spec 'cypress/e2e/production-canvas-deletion.cy.ts' --config-file cypress.config.production.ts",
+    "test:production:open": "cypress open --spec 'cypress/e2e/production-canvas-deletion.cy.ts' --config-file cypress.config.production.ts",
+    "test:object-creation-fix": "cypress run --spec 'cypress/e2e/object-creation-state-fix.cy.ts' --config-file cypress.config.local-dev.ts",
+    "test:object-creation-fix:open": "cypress open --spec 'cypress/e2e/object-creation-state-fix.cy.ts' --config-file cypress.config.local-dev.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

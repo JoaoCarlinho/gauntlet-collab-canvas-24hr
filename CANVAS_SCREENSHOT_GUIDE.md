@@ -159,3 +159,4 @@ You'll know you have the right screenshots when you see:
 5. **Share the results** to confirm object visibility is working
 
 The interactive test will guide you through the entire process and automatically capture all the screenshots you need!
+

@@ -103,3 +103,4 @@ All screenshots are saved in:
 ## Conclusion
 
 The testing infrastructure is working correctly and generating screenshots as expected. The main issues are related to Firebase authentication and missing UI elements for canvas functionality. Once these are resolved, the real-time object visibility testing will be able to properly verify the functionality.
+

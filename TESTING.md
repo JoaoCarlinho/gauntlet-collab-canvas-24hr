@@ -224,3 +224,4 @@ npm run test:e2e:local:headless
 ```
 
 This runs all tests in headless mode without opening the browser, perfect for automated testing.
+
