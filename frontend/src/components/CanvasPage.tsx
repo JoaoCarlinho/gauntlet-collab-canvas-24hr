@@ -13,6 +13,7 @@ import PresenceIndicators from './PresenceIndicators'
 import UserStatus from './UserStatus'
 import CollaborationSidebar from './CollaborationSidebar'
 import NotificationCenter from './NotificationCenter'
+import ZoomableCanvas from './ZoomableCanvas'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -30,7 +31,6 @@ const CanvasPage: React.FC = () => {
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
   
-  const stageRef = useRef<any>(null)
   const idToken = localStorage.getItem('idToken')
 
   useEffect(() => {
@@ -550,20 +550,20 @@ const CanvasPage: React.FC = () => {
 
       {/* Canvas */}
       <div className="flex-1 overflow-hidden">
-        <Stage
-          ref={stageRef}
+        <ZoomableCanvas
           width={window.innerWidth}
           height={window.innerHeight - 120}
-          onClick={handleStageClick}
-          onMouseMove={handleStageMouseMove}
-          onMouseUp={handleStageMouseUp}
+          onStageClick={handleStageClick}
+          onStageMouseMove={handleStageMouseMove}
+          onStageMouseUp={handleStageMouseUp}
+          showZoomControls={true}
+          zoomControlsPosition="bottom-right"
+          enableKeyboardShortcuts={true}
         >
-          <Layer>
-            {objects.map(renderObject)}
-            {renderNewObject()}
-            {renderCursors()}
-          </Layer>
-        </Stage>
+          {objects.map(renderObject)}
+          {renderNewObject()}
+          {renderCursors()}
+        </ZoomableCanvas>
       </div>
 
       {/* Collaboration Sidebar */}
