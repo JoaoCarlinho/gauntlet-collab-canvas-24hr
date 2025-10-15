@@ -27,7 +27,17 @@ def create_app(config_class=Config):
         "https://*.vercel.app"
     ]
     
-    socketio.init_app(app, cors_allowed_origins=allowed_origins, manage_session=False)
+    socketio.init_app(
+        app, 
+        cors_allowed_origins=allowed_origins, 
+        manage_session=False,
+        logger=True,
+        engineio_logger=True,
+        ping_timeout=60,
+        ping_interval=25,
+        max_http_buffer_size=1000000,
+        always_connect=True
+    )
     cors.init_app(app, origins=allowed_origins, supports_credentials=True)
     migrate.init_app(app, db)
     
