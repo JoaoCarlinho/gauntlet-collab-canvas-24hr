@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
-import { Canvas, CanvasObject, CursorData, OnlineUser } from '../types'
+import { Canvas, CanvasObject, CursorData } from '../types'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -450,8 +450,6 @@ const CanvasPage: React.FC = () => {
           {/* User Status */}
           {user && (
             <UserStatus 
-              userId={user.id} 
-              canvasId={canvasId!} 
               compact={true}
             />
           )}

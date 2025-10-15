@@ -2,15 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { ChevronDown, Circle, Clock, AlertCircle, X } from 'lucide-react'
 
 interface UserStatusProps {
-  userId?: string
-  canvasId?: string
   onStatusChange?: (status: string) => void
   compact?: boolean
 }
 
 const UserStatus: React.FC<UserStatusProps> = ({
-  userId,
-  canvasId,
   onStatusChange,
   compact = false
 }) => {

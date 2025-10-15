@@ -177,8 +177,6 @@ const CollaborationSidebar: React.FC<CollaborationSidebarProps> = ({
             <div className="bg-gray-50 rounded-lg p-4">
               <h3 className="font-medium text-gray-900 mb-3">Your Status</h3>
               <UserStatus 
-                userId={currentUserId} 
-                canvasId={canvasId}
                 compact={false}
               />
             </div>
