@@ -29,16 +29,25 @@ api.interceptors.response.use(
     return response
   },
   (error) => {
-    console.error('API request failed:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.message,
-      data: error.response?.data
-    })
+    // Filter out non-critical errors from browser extensions or third-party services
+    const url = error.config?.url || ''
+    const isExternalError = url.includes('/jwt') || url.includes('chrome-extension') || url.includes('moz-extension')
     
-    // Handle specific error cases
-    if (error.response?.status === 404) {
-      console.error('404 Error - Check if API URL is correct:', API_URL)
+    if (!isExternalError) {
+      console.error('API request failed:', {
+        url: error.config?.url,
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data
+      })
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        console.error('404 Error - Check if API URL is correct:', API_URL)
+      }
+    } else {
+      // Log external errors at debug level only
+      console.debug('External service error (ignored):', url, error.response?.status)
     }
     
     return Promise.reject(error)
