@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Users, Eye, Edit3 } from 'lucide-react'
+import { Plus, Users, Eye, Edit3, Trash2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { canvasAPI } from '../services/api'
 import { Canvas } from '../types'
@@ -13,6 +13,9 @@ const HomePage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newCanvasTitle, setNewCanvasTitle] = useState('')
   const [newCanvasDescription, setNewCanvasDescription] = useState('')
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [canvasToDelete, setCanvasToDelete] = useState<Canvas | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const modalRef = useRef<HTMLDivElement>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -22,12 +25,17 @@ const HomePage: React.FC = () => {
     }
   }, [isAuthenticated])
 
-  // Handle keyboard navigation for modal
+  // Handle keyboard navigation for modals
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (showCreateModal) {
+      if (showCreateModal || showDeleteModal) {
         if (event.key === 'Escape') {
-          setShowCreateModal(false)
+          if (showCreateModal) {
+            setShowCreateModal(false)
+          }
+          if (showDeleteModal) {
+            handleDeleteCancel()
+          }
         } else if (event.key === 'Tab') {
           // Trap focus within modal
           const modal = modalRef.current
@@ -54,18 +62,20 @@ const HomePage: React.FC = () => {
       }
     }
 
-    if (showCreateModal) {
+    if (showCreateModal || showDeleteModal) {
       document.addEventListener('keydown', handleKeyDown)
-      // Focus the title input when modal opens
-      setTimeout(() => {
-        titleInputRef.current?.focus()
-      }, 100)
+      // Focus the title input when create modal opens
+      if (showCreateModal) {
+        setTimeout(() => {
+          titleInputRef.current?.focus()
+        }, 100)
+      }
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showCreateModal])
+  }, [showCreateModal, showDeleteModal])
 
   const loadCanvases = async () => {
     try {
@@ -104,6 +114,39 @@ const HomePage: React.FC = () => {
     }
   }
 
+  const handleDeleteClick = (canvas: Canvas, event: React.MouseEvent) => {
+    event.preventDefault() // Prevent navigation to canvas
+    event.stopPropagation() // Prevent event bubbling
+    setCanvasToDelete(canvas)
+    setShowDeleteModal(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!canvasToDelete) return
+
+    try {
+      setIsDeleting(true)
+      await canvasAPI.deleteCanvas(canvasToDelete.id)
+      
+      // Remove canvas from local state
+      setCanvases(prev => prev.filter(canvas => canvas.id !== canvasToDelete.id))
+      
+      setShowDeleteModal(false)
+      setCanvasToDelete(null)
+      toast.success('Canvas deleted successfully!')
+    } catch (error) {
+      console.error('Failed to delete canvas:', error)
+      toast.error('Failed to delete canvas')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false)
+    setCanvasToDelete(null)
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center">
@@ -138,6 +181,7 @@ const HomePage: React.FC = () => {
               <button
                 onClick={() => setShowCreateModal(true)}
                 className="btn btn-primary flex items-center space-x-2"
+                data-testid="create-canvas-button"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Canvas</span>
@@ -167,41 +211,59 @@ const HomePage: React.FC = () => {
             <button
               onClick={() => setShowCreateModal(true)}
               className="btn btn-primary"
+              data-testid="create-canvas-button-empty"
             >
               Create Canvas
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="canvas-list">
             {canvases.map((canvas) => (
-              <Link
+              <div
                 key={canvas.id}
-                to={`/canvas/${canvas.id}`}
-                className="card p-6 hover:shadow-md transition-shadow"
+                className="card p-6 hover:shadow-md transition-shadow relative group"
+                data-testid="canvas-list-item"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-lg font-medium text-gray-900 truncate">
-                    {canvas.title}
-                  </h3>
-                  <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <Eye className="w-4 h-4" />
-                    <span>{canvas.object_count}</span>
-                    <Users className="w-4 h-4" />
-                    <span>{canvas.collaborator_count}</span>
+                <Link
+                  to={`/canvas/${canvas.id}`}
+                  className="block"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <h3 className="text-lg font-medium text-gray-900 truncate pr-8">
+                      {canvas.title}
+                    </h3>
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <Eye className="w-4 h-4" />
+                      <span>{canvas.object_count}</span>
+                      <Users className="w-4 h-4" />
+                      <span>{canvas.collaborator_count}</span>
+                    </div>
                   </div>
-                </div>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                  {canvas.description || 'No description'}
-                </p>
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>Updated {new Date(canvas.updated_at).toLocaleDateString()}</span>
-                  {canvas.is_public && (
-                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                      Public
-                    </span>
-                  )}
-                </div>
-              </Link>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {canvas.description || 'No description'}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Updated {new Date(canvas.updated_at).toLocaleDateString()}</span>
+                    {canvas.is_public && (
+                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                        Public
+                      </span>
+                    )}
+                  </div>
+                </Link>
+                
+                {/* Delete button - only show for owned canvases */}
+                {user && canvas.owner_id === user.id && (
+                  <button
+                    onClick={(e) => handleDeleteClick(canvas, e)}
+                    className="absolute top-4 right-4 p-1 text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    title="Delete canvas"
+                    aria-label={`Delete canvas "${canvas.title}"`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
@@ -231,6 +293,7 @@ const HomePage: React.FC = () => {
                   onChange={(e) => setNewCanvasTitle(e.target.value)}
                   className="input"
                   placeholder="Enter canvas title"
+                  data-testid="canvas-title-input"
                 />
               </div>
               <div>
@@ -243,6 +306,7 @@ const HomePage: React.FC = () => {
                   className="input"
                   rows={3}
                   placeholder="Enter canvas description"
+                  data-testid="canvas-description-input"
                 />
               </div>
             </div>
@@ -256,8 +320,53 @@ const HomePage: React.FC = () => {
               <button
                 onClick={createCanvas}
                 className="btn btn-primary"
+                data-testid="create-canvas-submit"
               >
                 Create Canvas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && canvasToDelete && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-canvas-title"
+          aria-describedby="delete-canvas-description"
+        >
+          <div ref={modalRef} className="card p-6 w-full max-w-md">
+            <h3 id="delete-canvas-title" className="text-lg font-medium text-gray-900 mb-4">
+              Delete Canvas
+            </h3>
+            <p id="delete-canvas-description" className="text-gray-600 mb-6">
+              Are you sure you want to delete "<strong>{canvasToDelete.title}</strong>"? 
+              This action cannot be undone and will permanently remove the canvas and all its contents.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleDeleteCancel}
+                className="btn btn-secondary"
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="btn bg-red-600 hover:bg-red-700 text-white"
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Deleting...</span>
+                  </div>
+                ) : (
+                  'Delete Canvas'
+                )}
               </button>
             </div>
           </div>
