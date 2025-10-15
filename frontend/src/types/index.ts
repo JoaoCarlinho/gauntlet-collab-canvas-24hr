@@ -22,7 +22,7 @@ export interface Canvas {
 export interface CanvasObject {
   id: string
   canvas_id: string
-  object_type: 'rectangle' | 'circle' | 'text'
+  object_type: 'rectangle' | 'circle' | 'text' | 'heart' | 'star' | 'diamond' | 'line' | 'arrow'
   properties: Record<string, any>
   created_by: string
   created_at: string
