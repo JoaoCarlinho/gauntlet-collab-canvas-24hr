@@ -18,12 +18,19 @@ class AuthService:
                 import firebase_admin
                 from firebase_admin import auth, credentials
                 
+                # Debug: Check Firebase environment variables
+                print("Firebase environment variables check:")
+                print(f"FIREBASE_PROJECT_ID: {'SET' if os.environ.get('FIREBASE_PROJECT_ID') else 'NOT SET'}")
+                print(f"FIREBASE_CLIENT_EMAIL: {'SET' if os.environ.get('FIREBASE_CLIENT_EMAIL') else 'NOT SET'}")
+                print(f"FIREBASE_PRIVATE_KEY: {'SET' if os.environ.get('FIREBASE_PRIVATE_KEY') else 'NOT SET'}")
+                
                 # Check if Firebase is already initialized
                 try:
                     firebase_admin.get_app()
+                    print("Firebase already initialized")
                 except ValueError:
                     # Initialize Firebase with service account
-                    cred = credentials.Certificate({
+                    firebase_config = {
                         "type": "service_account",
                         "project_id": os.environ.get('FIREBASE_PROJECT_ID'),
                         "private_key_id": os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
@@ -34,14 +41,27 @@ class AuthService:
                         "token_uri": os.environ.get('FIREBASE_TOKEN_URI'),
                         "auth_provider_x509_cert_url": os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL'),
                         "client_x509_cert_url": os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
-                    })
+                    }
+                    
+                    # Check if all required fields are present
+                    required_fields = ['project_id', 'private_key', 'client_email']
+                    missing_fields = [field for field in required_fields if not firebase_config.get(field)]
+                    
+                    if missing_fields:
+                        print(f"Missing Firebase environment variables: {missing_fields}")
+                        raise Exception(f"Missing Firebase environment variables: {missing_fields}")
+                    
+                    cred = credentials.Certificate(firebase_config)
                     firebase_admin.initialize_app(cred)
+                    print("Firebase initialized successfully")
             else:
                 # Mock Firebase for testing
                 self._mock_firebase = True
+                print("Using mock Firebase for testing")
         except ImportError:
             # Firebase not available, use mock
             self._mock_firebase = True
+            print("Firebase not available, using mock")
         except Exception as e:
             print(f"Firebase initialization failed: {e}")
             self._mock_firebase = True
