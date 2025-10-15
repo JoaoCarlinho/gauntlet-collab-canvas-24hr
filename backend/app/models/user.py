@@ -13,7 +13,7 @@ class User(db.Model):
     
     # Relationships
     owned_canvases = db.relationship('Canvas', backref='owner', lazy='dynamic', foreign_keys='Canvas.owner_id')
-    canvas_permissions = db.relationship('CanvasPermission', backref='user', lazy='dynamic')
+    canvas_permissions = db.relationship('CanvasPermission', backref='user', lazy='dynamic', foreign_keys='CanvasPermission.user_id')
     sent_invitations = db.relationship('Invitation', backref='inviter', lazy='dynamic', foreign_keys='Invitation.inviter_id')
     received_invitations = db.relationship('Invitation', backref='invitee', lazy='dynamic', foreign_keys='Invitation.invitee_email')
     
