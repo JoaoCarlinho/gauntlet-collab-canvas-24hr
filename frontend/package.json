@@ -11,7 +11,11 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "cypress open",
-    "test:e2e:headless": "cypress run"
+    "test:e2e:headless": "cypress run",
+    "test:e2e:local": "cypress open --config-file cypress.config.local.ts",
+    "test:e2e:local:headless": "cypress run --config-file cypress.config.local.ts",
+    "test:user-stories": "cypress run --spec 'cypress/e2e/user-stories.cy.ts' --config-file cypress.config.local.ts",
+    "test:user-stories:open": "cypress open --spec 'cypress/e2e/user-stories.cy.ts' --config-file cypress.config.local.ts"
   },
   "dependencies": {
     "react": "^18.2.0",
