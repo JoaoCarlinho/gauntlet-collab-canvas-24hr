@@ -1,13 +1,18 @@
 import axios from 'axios'
 import { User, Canvas, CanvasObject, Invitation } from '../types'
+import { getApiUrl } from '../utils/env'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = getApiUrl()
+
+console.log('API Service initialized with URL:', API_URL)
+console.log('Full baseURL will be:', `${API_URL}/api`)
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 })
 
 // Add auth token to requests
@@ -16,8 +21,50 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  
+  const fullUrl = (config.baseURL || '') + (config.url || '')
+  console.log('Making API request to:', fullUrl)
+  console.log('Request config:', {
+    baseURL: config.baseURL,
+    url: config.url,
+    method: config.method,
+    headers: config.headers
+  })
+  
   return config
 })
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => {
+    console.log('API response received:', response.status, response.config.url)
+    return response
+  },
+  (error) => {
+    // Filter out non-critical errors from browser extensions or third-party services
+    const url = error.config?.url || ''
+    const isExternalError = url.includes('/jwt') || url.includes('chrome-extension') || url.includes('moz-extension')
+    
+    if (!isExternalError) {
+      console.error('API request failed:', {
+        url: error.config?.url,
+        status: error.response?.status,
+        message: error.message,
+        data: error.response?.data
+      })
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        console.error('404 Error - Check if API URL is correct:', API_URL)
+      }
+    } else {
+      // Log external errors at debug level only
+      console.debug('External service error (ignored):', url, error.response?.status)
+    }
+    
+    return Promise.reject(error)
+  }
+)
 
 // Auth API
 export const authAPI = {

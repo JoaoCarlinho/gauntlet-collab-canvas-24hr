@@ -19,6 +19,9 @@ def create_app(config_class=Config):
         "http://localhost:3000",
         "http://localhost:5173", 
         "https://gauntlet-collab-canvas-24hr.vercel.app",
+        "https://gauntlet-collab-canvas-24hr-h7jvqmw9s-j-skeetes-projects.vercel.app",
+        "https://gauntlet-collab-canvas-24hr-6l0tp5fsf-j-skeetes-projects.vercel.app",
+        "https://gauntlet-collab-canvas-24hr-72qpaeq3m-j-skeetes-projects.vercel.app",
         "https://*.vercel.app"
     ]
     
