@@ -12,6 +12,8 @@ import InviteCollaboratorModal from './InviteCollaboratorModal'
 import CollaboratorManagement from './CollaboratorManagement'
 import PresenceIndicators from './PresenceIndicators'
 import UserStatus from './UserStatus'
+import CollaborationSidebar from './CollaborationSidebar'
+import NotificationCenter from './NotificationCenter'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -29,6 +31,7 @@ const CanvasPage: React.FC = () => {
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCollaboratorPanel, setShowCollaboratorPanel] = useState(false)
+  const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
   
   const stageRef = useRef<any>(null)
   const idToken = localStorage.getItem('idToken')
@@ -471,18 +474,21 @@ const CanvasPage: React.FC = () => {
               </button>
               
               <button
-                onClick={() => setShowCollaboratorPanel(!showCollaboratorPanel)}
+                onClick={() => setShowCollaborationSidebar(!showCollaborationSidebar)}
                 className={`p-2 rounded-lg transition-colors ${
-                  showCollaboratorPanel 
+                  showCollaborationSidebar 
                     ? 'text-primary-600 bg-primary-50' 
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                 }`}
-                title="Manage collaborators"
+                title="Collaboration panel"
               >
                 <Users className="w-5 h-5" />
               </button>
             </>
           )}
+          
+          {/* Notification Center */}
+          <NotificationCenter />
           
           <button className="p-2 hover:bg-gray-100 rounded-lg">
             <Settings className="w-5 h-5" />
@@ -567,27 +573,16 @@ const CanvasPage: React.FC = () => {
         </Stage>
       </div>
 
-      {/* Collaborator Management Panel */}
-      {showCollaboratorPanel && canvas && user && canvas.owner_id === user.id && (
-        <div className="absolute top-16 right-4 w-96 bg-white rounded-lg shadow-lg border z-40 max-h-[calc(100vh-8rem)] overflow-y-auto">
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">Collaboration</h3>
-              <button
-                onClick={() => setShowCollaboratorPanel(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="p-4">
-            <CollaboratorManagement 
-              canvasId={canvasId!} 
-              isOwner={canvas.owner_id === user.id} 
-            />
-          </div>
-        </div>
+      {/* Collaboration Sidebar */}
+      {canvas && user && (
+        <CollaborationSidebar
+          canvasId={canvasId!}
+          canvasTitle={canvas.title}
+          currentUserId={user.id}
+          isOwner={canvas.owner_id === user.id}
+          isOpen={showCollaborationSidebar}
+          onClose={() => setShowCollaborationSidebar(false)}
+        />
       )}
 
       {/* Invitation Modal */}
