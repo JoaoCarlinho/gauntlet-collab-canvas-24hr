@@ -7,7 +7,8 @@ import {
   getGoogleRedirectResult,
   AuthenticationError,
   refreshFirebaseToken,
-  isUserAuthenticated
+  isUserAuthenticated,
+  initializeAuthPersistence
 } from '../services/firebase'
 import { authAPI } from '../services/api'
 import { User, AuthState } from '../types'
@@ -39,6 +40,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const handleRedirectResult = async () => {
       console.log('=== App initialization - checking auth state ===')
+      
+      // Initialize auth persistence first
+      console.log('Initializing Firebase auth persistence...')
+      await initializeAuthPersistence()
+      
       console.log('Current Firebase user:', auth.currentUser ? 'Present' : 'Null')
       console.log('Local storage token:', localStorage.getItem('idToken') ? 'Present' : 'Missing')
       
@@ -253,78 +259,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated])
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      console.log('=== Firebase auth state changed ===')
-      console.log('Firebase user:', firebaseUser ? 'Present' : 'Null')
-      console.log('Current timestamp:', new Date().toISOString())
+    // Delay setting up the auth state listener to ensure persistence is established
+    const setupAuthListener = async () => {
+      console.log('Setting up Firebase auth state listener...')
       
-      if (firebaseUser) {
-        console.log('User details from Firebase:', {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          emailVerified: firebaseUser.emailVerified,
-          metadata: {
-            creationTime: firebaseUser.metadata.creationTime,
-            lastSignInTime: firebaseUser.metadata.lastSignInTime
-          }
-        })
+      // Wait a bit for persistence to be fully established
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+        console.log('=== Firebase auth state changed ===')
+        console.log('Firebase user:', firebaseUser ? 'Present' : 'Null')
+        console.log('Current timestamp:', new Date().toISOString())
         
-        try {
-          console.log('Getting Firebase ID token...')
-          const idToken = await firebaseUser.getIdToken()
-          console.log('ID token received, length:', idToken.length)
-          localStorage.setItem('idToken', idToken)
-          
-          console.log('Calling backend API to get user data...')
-          const response = await authAPI.getCurrentUser()
-          console.log('Backend user data received:', response.user)
-          
-          setUser(response.user)
-          setIsAuthenticated(true)
-          console.log('=== User authenticated successfully ===')
-        } catch (error) {
-          console.error('=== Failed to get user data from backend ===')
-          console.error('Error details:', error)
-          
-          // Try to refresh token and retry
-          console.log('Attempting to refresh token and retry...')
-          try {
-            const refreshedToken = await refreshFirebaseToken()
-            if (refreshedToken) {
-              localStorage.setItem('idToken', refreshedToken)
-              console.log('Token refreshed, retrying API call...')
-              const retryResponse = await authAPI.getCurrentUser()
-              setUser(retryResponse.user)
-              setIsAuthenticated(true)
-              console.log('=== User authenticated successfully after retry ===')
-              return
+        if (firebaseUser) {
+          console.log('User details from Firebase:', {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            emailVerified: firebaseUser.emailVerified,
+            metadata: {
+              creationTime: firebaseUser.metadata.creationTime,
+              lastSignInTime: firebaseUser.metadata.lastSignInTime
             }
-          } catch (retryError) {
-            console.error('Retry also failed:', retryError)
-          }
+          })
           
+          try {
+            console.log('Getting Firebase ID token...')
+            const idToken = await firebaseUser.getIdToken()
+            console.log('ID token received, length:', idToken.length)
+            localStorage.setItem('idToken', idToken)
+            
+            console.log('Calling backend API to get user data...')
+            const response = await authAPI.getCurrentUser()
+            console.log('Backend user data received:', response.user)
+            
+            setUser(response.user)
+            setIsAuthenticated(true)
+            console.log('=== User authenticated successfully ===')
+          } catch (error) {
+            console.error('=== Failed to get user data from backend ===')
+            console.error('Error details:', error)
+            
+            // Try to refresh token and retry
+            console.log('Attempting to refresh token and retry...')
+            try {
+              const refreshedToken = await refreshFirebaseToken()
+              if (refreshedToken) {
+                localStorage.setItem('idToken', refreshedToken)
+                console.log('Token refreshed, retrying API call...')
+                const retryResponse = await authAPI.getCurrentUser()
+                setUser(retryResponse.user)
+                setIsAuthenticated(true)
+                console.log('=== User authenticated successfully after retry ===')
+                return
+              }
+            } catch (retryError) {
+              console.error('Retry also failed:', retryError)
+            }
+            
+            setUser(null)
+            setIsAuthenticated(false)
+          }
+        } else {
+          console.log('No Firebase user - clearing auth state')
+          console.log('Auth state change reason: Firebase user became null')
+          console.log('Current auth state before clearing:', {
+            hasLocalToken: !!localStorage.getItem('idToken'),
+            reactUser: user,
+            reactAuthenticated: isAuthenticated
+          })
+          
+          localStorage.removeItem('idToken')
           setUser(null)
           setIsAuthenticated(false)
+          console.log('=== User signed out ===')
         }
-      } else {
-        console.log('No Firebase user - clearing auth state')
-        console.log('Auth state change reason: Firebase user became null')
-        console.log('Current auth state before clearing:', {
-          hasLocalToken: !!localStorage.getItem('idToken'),
-          reactUser: user,
-          reactAuthenticated: isAuthenticated
-        })
-        
-        localStorage.removeItem('idToken')
-        setUser(null)
-        setIsAuthenticated(false)
-        console.log('=== User signed out ===')
-      }
-      setIsLoading(false)
+        setIsLoading(false)
+      })
+
+      return unsubscribe
+    }
+
+    let unsubscribe: (() => void) | undefined
+
+    setupAuthListener().then((unsub) => {
+      unsubscribe = unsub
     })
 
-    return unsubscribe
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
   const value: AuthContextType = {

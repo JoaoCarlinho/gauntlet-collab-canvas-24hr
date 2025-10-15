@@ -46,17 +46,21 @@ console.log('Firebase app initialized:', {
 })
 
 // Configure Firebase auth persistence
-setPersistence(auth, browserLocalPersistence).then(() => {
-  console.log('Firebase auth persistence set to browserLocalPersistence')
-}).catch((error) => {
-  console.error('Failed to set auth persistence:', error)
-  // Fallback to session persistence if local fails
-  setPersistence(auth, browserSessionPersistence).then(() => {
-    console.log('Firebase auth persistence set to browserSessionPersistence (fallback)')
-  }).catch((fallbackError) => {
-    console.error('Failed to set session persistence:', fallbackError)
-  })
-})
+export const initializeAuthPersistence = async (): Promise<void> => {
+  try {
+    await setPersistence(auth, browserLocalPersistence)
+    console.log('Firebase auth persistence set to browserLocalPersistence')
+  } catch (error) {
+    console.error('Failed to set auth persistence:', error)
+    // Fallback to session persistence if local fails
+    try {
+      await setPersistence(auth, browserSessionPersistence)
+      console.log('Firebase auth persistence set to browserSessionPersistence (fallback)')
+    } catch (fallbackError) {
+      console.error('Failed to set session persistence:', fallbackError)
+    }
+  }
+}
 
 const googleProvider = new GoogleAuthProvider()
 // Add additional scopes if needed
