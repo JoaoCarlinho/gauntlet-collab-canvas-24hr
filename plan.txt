@@ -1,0 +1,568 @@
+I'll examine the codebase to understand the current implementation and plan the requested functionality for text editing, text moving, and shape resizing.
+
+
+[5 tools called]
+
+Now let me create a comprehensive plan for implementing the requested functionality:
+
+## 📋 Development Plan: Enhanced Object Interaction
+
+### 🔍 Current Implementation Analysis
+
+**Current State:**
+- **Text Objects**: Basic Konva `Text` components with static text content
+- **Object Selection**: Only drag functionality when `selectedTool === 'select'`
+- **No Text Editing**: Text content cannot be modified after placement
+- **No Resizing**: Shapes cannot be resized after creation
+- **Basic Dragging**: Objects can be moved but no visual selection indicators
+
+**Current Limitations:**
+- ❌ No text editing after placement
+- ❌ No visual selection indicators
+- ❌ No resize handles for any shapes
+- ❌ No double-click to edit text
+- ❌ No object selection state management
+
+---
+
+## 🎯 Feature Implementation Plans
+
+### **1. Text Editing After Placement**
+
+#### **Current Text Implementation:**
+```typescript
+// Current text rendering (lines 305-326 in CanvasPage.tsx)
+case 'text':
+  return (
+    <Text
+      key={obj.id}
+      x={props.x}
+      y={props.y}
+      text={props.text}
+      fontSize={props.fontSize}
+      fill={props.fill}
+      fontFamily={props.fontFamily}
+      draggable={selectedTool === 'select'}
+      onDragEnd={(e) => { /* update position */ }}
+    />
+  )
+```
+
+#### **Proposed Text Editing Solution:**
+
+**1.1 Enhanced Text Component with Editing**
+```typescript
+interface EditableTextProps {
+  object: CanvasObject
+  isSelected: boolean
+  isEditing: boolean
+  onStartEdit: (objectId: string) => void
+  onEndEdit: (objectId: string, newText: string) => void
+  onSelect: (objectId: string) => void
+}
+
+const EditableText: React.FC<EditableTextProps> = ({
+  object,
+  isSelected,
+  isEditing,
+  onStartEdit,
+  onEndEdit,
+  onSelect
+}) => {
+  const [text, setText] = useState(object.properties.text)
+  const textRef = useRef<any>(null)
+
+  const handleDoubleClick = () => {
+    if (!isEditing) {
+      onStartEdit(object.id)
+    }
+  }
+
+  const handleTextChange = (e: any) => {
+    setText(e.target.value())
+  }
+
+  const handleBlur = () => {
+    onEndEdit(object.id, text)
+  }
+
+  return (
+    <Group>
+      {/* Selection indicator */}
+      {isSelected && (
+        <Rect
+          x={object.properties.x - 5}
+          y={object.properties.y - 5}
+          width={object.properties.width || 100}
+          height={object.properties.height || 30}
+          stroke="#3b82f6"
+          strokeWidth={2}
+          dash={[5, 5]}
+          fill="transparent"
+        />
+      )}
+      
+      {/* Text component */}
+      <Text
+        ref={textRef}
+        x={object.properties.x}
+        y={object.properties.y}
+        text={isEditing ? text : object.properties.text}
+        fontSize={object.properties.fontSize}
+        fill={object.properties.fill}
+        fontFamily={object.properties.fontFamily}
+        draggable={!isEditing && selectedTool === 'select'}
+        onDblClick={handleDoubleClick}
+        onClick={() => onSelect(object.id)}
+        onDragEnd={(e) => {
+          // Update position
+        }}
+        // Enable text editing
+        editable={isEditing}
+        onTextChange={handleTextChange}
+        onBlur={handleBlur}
+      />
+    </Group>
+  )
+}
+```
+
+**1.2 State Management for Text Editing**
+```typescript
+// Add to CanvasPage component state
+const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
+const [editingText, setEditingText] = useState<string>('')
+
+// Text editing handlers
+const handleStartTextEdit = (objectId: string) => {
+  setEditingObjectId(objectId)
+  setSelectedObjectId(objectId)
+  const object = objects.find(obj => obj.id === objectId)
+  if (object) {
+    setEditingText(object.properties.text)
+  }
+}
+
+const handleEndTextEdit = async (objectId: string, newText: string) => {
+  if (idToken && newText !== objects.find(obj => obj.id === objectId)?.properties.text) {
+    await socketService.updateObject(canvasId!, idToken, objectId, {
+      text: newText
+    })
+  }
+  setEditingObjectId(null)
+  setEditingText('')
+}
+```
+
+---
+
+### **2. Text Moving Functionality**
+
+#### **Current Moving Implementation:**
+- ✅ Basic dragging already implemented
+- ❌ No visual feedback during drag
+- ❌ No selection indicators
+
+#### **Enhanced Moving Solution:**
+
+**2.1 Visual Selection Indicators**
+```typescript
+const renderSelectionIndicator = (object: CanvasObject) => {
+  if (selectedObjectId !== object.id) return null
+
+  const props = object.properties
+  let bounds = { x: props.x, y: props.y, width: 0, height: 0 }
+
+  switch (object.object_type) {
+    case 'rectangle':
+      bounds = { x: props.x, y: props.y, width: props.width, height: props.height }
+      break
+    case 'circle':
+      bounds = { 
+        x: props.x - props.radius, 
+        y: props.y - props.radius, 
+        width: props.radius * 2, 
+        height: props.radius * 2 
+      }
+      break
+    case 'text':
+      // Calculate text bounds (approximate)
+      bounds = { 
+        x: props.x, 
+        y: props.y, 
+        width: props.text.length * props.fontSize * 0.6, 
+        height: props.fontSize * 1.2 
+      }
+      break
+  }
+
+  return (
+    <Rect
+      x={bounds.x - 5}
+      y={bounds.y - 5}
+      width={bounds.width + 10}
+      height={bounds.height + 10}
+      stroke="#3b82f6"
+      strokeWidth={2}
+      dash={[5, 5]}
+      fill="transparent"
+    />
+  )
+}
+```
+
+**2.2 Enhanced Drag Feedback**
+```typescript
+const [isDragging, setIsDragging] = useState(false)
+const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+
+const handleDragStart = (e: any, objectId: string) => {
+  setIsDragging(true)
+  setSelectedObjectId(objectId)
+  const object = objects.find(obj => obj.id === objectId)
+  if (object) {
+    setDragOffset({
+      x: e.target.x() - object.properties.x,
+      y: e.target.y() - object.properties.y
+    })
+  }
+}
+
+const handleDragMove = (e: any) => {
+  if (isDragging && selectedObjectId) {
+    // Update visual position in real-time
+    e.target.position({
+      x: e.target.x() - dragOffset.x,
+      y: e.target.y() - dragOffset.y
+    })
+  }
+}
+```
+
+---
+
+### **3. Shape Resizing Functionality**
+
+#### **Current Resizing State:**
+- ❌ No resize handles for any shapes
+- ❌ No resize functionality after creation
+- ❌ Shapes are created with fixed dimensions
+
+#### **Comprehensive Resizing Solution:**
+
+**3.1 Resize Handles Component**
+```typescript
+interface ResizeHandlesProps {
+  object: CanvasObject
+  isSelected: boolean
+  onResize: (objectId: string, newProperties: any) => void
+}
+
+const ResizeHandles: React.FC<ResizeHandlesProps> = ({
+  object,
+  isSelected,
+  onResize
+}) => {
+  if (!isSelected) return null
+
+  const props = object.properties
+  const handleSize = 8
+  const handleOffset = handleSize / 2
+
+  const getHandles = () => {
+    switch (object.object_type) {
+      case 'rectangle':
+        return [
+          // Corner handles
+          { x: props.x - handleOffset, y: props.y - handleOffset, cursor: 'nw-resize' },
+          { x: props.x + props.width - handleOffset, y: props.y - handleOffset, cursor: 'ne-resize' },
+          { x: props.x - handleOffset, y: props.y + props.height - handleOffset, cursor: 'sw-resize' },
+          { x: props.x + props.width - handleOffset, y: props.y + props.height - handleOffset, cursor: 'se-resize' },
+          // Edge handles
+          { x: props.x + props.width/2 - handleOffset, y: props.y - handleOffset, cursor: 'n-resize' },
+          { x: props.x + props.width/2 - handleOffset, y: props.y + props.height - handleOffset, cursor: 's-resize' },
+          { x: props.x - handleOffset, y: props.y + props.height/2 - handleOffset, cursor: 'w-resize' },
+          { x: props.x + props.width - handleOffset, y: props.y + props.height/2 - handleOffset, cursor: 'e-resize' }
+        ]
+      case 'circle':
+        return [
+          // 8 handles around the circle
+          { x: props.x - handleOffset, y: props.y - props.radius - handleOffset, cursor: 'n-resize' },
+          { x: props.x + props.radius - handleOffset, y: props.y - handleOffset, cursor: 'e-resize' },
+          { x: props.x - handleOffset, y: props.y + props.radius - handleOffset, cursor: 's-resize' },
+          { x: props.x - props.radius - handleOffset, y: props.y - handleOffset, cursor: 'w-resize' },
+          // Diagonal handles
+          { x: props.x + props.radius * 0.707 - handleOffset, y: props.y - props.radius * 0.707 - handleOffset, cursor: 'ne-resize' },
+          { x: props.x + props.radius * 0.707 - handleOffset, y: props.y + props.radius * 0.707 - handleOffset, cursor: 'se-resize' },
+          { x: props.x - props.radius * 0.707 - handleOffset, y: props.y + props.radius * 0.707 - handleOffset, cursor: 'sw-resize' },
+          { x: props.x - props.radius * 0.707 - handleOffset, y: props.y - props.radius * 0.707 - handleOffset, cursor: 'nw-resize' }
+        ]
+      case 'text':
+        // Text resizing handles (font size adjustment)
+        return [
+          { x: props.x + props.text.length * props.fontSize * 0.6 - handleOffset, y: props.y - handleOffset, cursor: 'e-resize' },
+          { x: props.x + props.text.length * props.fontSize * 0.6 - handleOffset, y: props.y + props.fontSize * 1.2 - handleOffset, cursor: 'e-resize' }
+        ]
+      default:
+        return []
+    }
+  }
+
+  return (
+    <Group>
+      {getHandles().map((handle, index) => (
+        <Rect
+          key={index}
+          x={handle.x}
+          y={handle.y}
+          width={handleSize}
+          height={handleSize}
+          fill="#3b82f6"
+          stroke="#fff"
+          strokeWidth={1}
+          draggable={true}
+          onDragMove={(e) => handleResize(e, object, index)}
+          style={{ cursor: handle.cursor }}
+        />
+      ))}
+    </Group>
+  )
+}
+```
+
+**3.2 Resize Logic Implementation**
+```typescript
+const handleResize = (e: any, object: CanvasObject, handleIndex: number) => {
+  const newProperties = { ...object.properties }
+  const deltaX = e.target.x() - (e.target.attrs.x || 0)
+  const deltaY = e.target.y() - (e.target.attrs.y || 0)
+
+  switch (object.object_type) {
+    case 'rectangle':
+      handleRectangleResize(newProperties, handleIndex, deltaX, deltaY)
+      break
+    case 'circle':
+      handleCircleResize(newProperties, handleIndex, deltaX, deltaY)
+      break
+    case 'text':
+      handleTextResize(newProperties, handleIndex, deltaX, deltaY)
+      break
+  }
+
+  // Update object in real-time
+  socketService.updateObject(canvasId!, idToken!, object.id, newProperties)
+}
+
+const handleRectangleResize = (props: any, handleIndex: number, deltaX: number, deltaY: number) => {
+  switch (handleIndex) {
+    case 0: // Top-left
+      props.x += deltaX
+      props.y += deltaY
+      props.width -= deltaX
+      props.height -= deltaY
+      break
+    case 1: // Top-right
+      props.y += deltaY
+      props.width += deltaX
+      props.height -= deltaY
+      break
+    case 2: // Bottom-left
+      props.x += deltaX
+      props.width -= deltaX
+      props.height += deltaY
+      break
+    case 3: // Bottom-right
+      props.width += deltaX
+      props.height += deltaY
+      break
+    // Edge handles...
+  }
+}
+
+const handleCircleResize = (props: any, handleIndex: number, deltaX: number, deltaY: number) => {
+  // Calculate new radius based on handle position
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+  props.radius = Math.max(10, props.radius + distance)
+}
+
+const handleTextResize = (props: any, handleIndex: number, deltaX: number, deltaY: number) => {
+  // Adjust font size based on horizontal resize
+  const newFontSize = Math.max(8, props.fontSize + deltaX * 0.5)
+  props.fontSize = newFontSize
+}
+```
+
+---
+
+## 🛠️ Implementation Roadmap
+
+### **Phase 1: Text Editing (Priority: High)**
+1. **Create EditableText Component**
+   - [ ] Implement double-click to edit
+   - [ ] Add text input overlay
+   - [ ] Handle text change events
+   - [ ] Save changes via socket
+
+2. **State Management**
+   - [ ] Add `selectedObjectId` state
+   - [ ] Add `editingObjectId` state
+   - [ ] Implement selection handlers
+   - [ ] Add keyboard shortcuts (Enter to save, Escape to cancel)
+
+### **Phase 2: Visual Selection (Priority: High)**
+1. **Selection Indicators**
+   - [ ] Create selection border component
+   - [ ] Add click-to-select functionality
+   - [ ] Implement visual feedback
+   - [ ] Handle multi-object selection
+
+2. **Enhanced Dragging**
+   - [ ] Improve drag feedback
+   - [ ] Add drag preview
+   - [ ] Implement snap-to-grid (optional)
+   - [ ] Add drag constraints
+
+### **Phase 3: Shape Resizing (Priority: Medium)**
+1. **Resize Handles**
+   - [ ] Create ResizeHandles component
+   - [ ] Implement handle positioning
+   - [ ] Add resize logic for each shape type
+   - [ ] Handle resize constraints
+
+2. **Resize Interactions**
+   - [ ] Implement drag-to-resize
+   - [ ] Add real-time updates
+   - [ ] Handle minimum/maximum sizes
+   - [ ] Add resize preview
+
+### **Phase 4: Polish & Advanced Features (Priority: Low)**
+1. **Advanced Interactions**
+   - [ ] Multi-object selection
+   - [ ] Copy/paste functionality
+   - [ ] Undo/redo system
+   - [ ] Object grouping
+
+2. **Performance Optimizations**
+   - [ ] Debounce resize events
+   - [ ] Optimize re-renders
+   - [ ] Implement object pooling
+   - [ ] Add lazy loading
+
+---
+
+## 🎨 User Experience Improvements
+
+### **Before Implementation:**
+- ❌ Text cannot be edited after placement
+- ❌ No visual selection feedback
+- ❌ No resize capabilities
+- ❌ Basic drag functionality only
+
+### **After Implementation:**
+- ✅ Double-click text to edit inline
+- ✅ Visual selection indicators with borders
+- ✅ Resize handles for all shapes
+- ✅ Smooth drag interactions with feedback
+- ✅ Keyboard shortcuts for common actions
+- ✅ Real-time collaborative updates
+
+### **Key User Interactions:**
+1. **Text Editing**: Double-click text → Edit inline → Press Enter to save
+2. **Object Selection**: Click object → See selection border → Drag to move
+3. **Shape Resizing**: Select shape → See resize handles → Drag handles to resize
+4. **Multi-tool Support**: Switch between select, draw, and edit modes seamlessly
+
+
+[1 tool called]
+
+## 📋 Complete Development Plan Summary
+
+I've thoroughly analyzed the codebase and created a comprehensive plan for implementing the three requested features:
+
+### 🎯 **Feature Analysis & Implementation Plans**
+
+#### **1. Text Editing After Placement**
+**Current State:** Text objects are static after creation
+**Solution:** 
+- Create `EditableText` component with inline editing
+- Double-click to edit, Enter to save, Escape to cancel
+- Real-time text updates via socket
+- Visual editing state indicators
+
+#### **2. Text Moving Functionality** 
+**Current State:** Basic dragging exists but no visual feedback
+**Solution:**
+- Enhanced selection indicators with dashed borders
+- Improved drag feedback and preview
+- Click-to-select functionality
+- Visual state management for selected objects
+
+#### **3. Shape Resizing After Placement**
+**Current State:** No resize capabilities for any shapes
+**Solution:**
+- `ResizeHandles` component with 8 handles for rectangles
+- 8 handles around circles for radius adjustment
+- Font size handles for text objects
+- Real-time resize updates with constraints
+
+### 🏗️ **Technical Implementation Strategy**
+
+**Component Architecture:**
+- `EditableText.tsx` - Enhanced text with editing capabilities
+- `ResizeHandles.tsx` - Reusable resize handle system
+- `SelectionIndicator.tsx` - Visual selection feedback
+- Enhanced `CanvasPage.tsx` with new state management
+
+**State Management:**
+- `selectedObjectId` - Track currently selected object
+- `editingObjectId` - Track object being edited
+- `isDragging` - Track drag state
+- `dragOffset` - Handle drag positioning
+
+**Konva.js Features:**
+- `Group` components for complex interactions
+- `Rect` components for selection borders and handles
+- Enhanced event handlers for drag, resize, and edit
+- Real-time property updates via socket
+
+### 🚀 **Implementation Phases**
+
+**Phase 1: Text Editing (High Priority)**
+- Inline text editing with double-click
+- Save/cancel functionality
+- Real-time collaborative updates
+
+**Phase 2: Visual Selection (High Priority)**
+- Selection indicators and borders
+- Click-to-select functionality
+- Enhanced drag feedback
+
+**Phase 3: Shape Resizing (Medium Priority)**
+- Resize handles for all shape types
+- Drag-to-resize functionality
+- Size constraints and validation
+
+**Phase 4: Polish (Low Priority)**
+- Multi-object selection
+- Copy/paste functionality
+- Performance optimizations
+
+### 🎨 **User Experience Benefits**
+
+**Before:**
+- Static text objects
+- No visual selection feedback
+- No resize capabilities
+- Basic drag functionality
+
+**After:**
+- ✅ Double-click text to edit inline
+- ✅ Visual selection with borders and handles
+- ✅ Resize any shape after placement
+- ✅ Smooth, responsive interactions
+- ✅ Real-time collaborative updates
+- ✅ Professional drawing application feel
+
+The plan provides a complete roadmap for transforming CollabCanvas into a fully-featured collaborative drawing application with professional-grade object manipulation capabilities!
+

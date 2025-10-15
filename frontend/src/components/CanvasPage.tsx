@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Rect, Circle, Text } from 'react-konva'
+import { Rect, Circle, Text, Group } from 'react-konva'
 import { ArrowLeft, Users, Settings, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
@@ -14,6 +14,9 @@ import UserStatus from './UserStatus'
 import CollaborationSidebar from './CollaborationSidebar'
 import NotificationCenter from './NotificationCenter'
 import ZoomableCanvas from './ZoomableCanvas'
+import EditableText from './EditableText'
+import ResizeHandles from './ResizeHandles'
+import SelectionIndicator from './SelectionIndicator'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -30,6 +33,12 @@ const CanvasPage: React.FC = () => {
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
+  
+  // New state for enhanced object interactions
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
+  const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
   
   const idToken = localStorage.getItem('idToken')
 
@@ -61,19 +70,25 @@ const CanvasPage: React.FC = () => {
     }
   }, [isAuthenticated, canvasId, isConnected])
 
-  // Handle escape key to cancel drawing
+  // Handle escape key to cancel drawing or editing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isDrawing) {
-        setNewObject(null)
-        setIsDrawing(false)
-        setSelectedTool('select')
+      if (e.key === 'Escape') {
+        if (isDrawing) {
+          setNewObject(null)
+          setIsDrawing(false)
+          setSelectedTool('select')
+        } else if (editingObjectId) {
+          setEditingObjectId(null)
+        } else if (selectedObjectId) {
+          setSelectedObjectId(null)
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isDrawing])
+  }, [isDrawing, editingObjectId, selectedObjectId])
 
   const loadCanvas = async () => {
     try {
@@ -142,7 +157,48 @@ const CanvasPage: React.FC = () => {
     // Online users are now handled by PresenceIndicators component
   }
 
+  // New handler functions for enhanced interactions
+  const handleObjectSelect = (objectId: string) => {
+    if (selectedTool === 'select') {
+      setSelectedObjectId(objectId)
+      setEditingObjectId(null)
+    }
+  }
+
+  const handleStartTextEdit = (objectId: string) => {
+    setEditingObjectId(objectId)
+    setSelectedObjectId(objectId)
+  }
+
+  const handleEndTextEdit = async (objectId: string, newText: string) => {
+    if (idToken && newText !== objects.find(obj => obj.id === objectId)?.properties.text) {
+      await socketService.updateObject(canvasId!, idToken, objectId, {
+        text: newText
+      })
+    }
+    setEditingObjectId(null)
+  }
+
+  const handleObjectResize = async (objectId: string, newProperties: any) => {
+    if (idToken) {
+      await socketService.updateObject(canvasId!, idToken, objectId, newProperties)
+    }
+  }
+
+  const handleObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
+    if (idToken) {
+      await socketService.updateObject(canvasId!, idToken, objectId, { x, y })
+    }
+  }
+
   const handleStageClick = (e: any) => {
+    // Clear selection if clicking on empty space
+    if (selectedTool === 'select' && e.target === e.target.getStage()) {
+      setSelectedObjectId(null)
+      setEditingObjectId(null)
+      return
+    }
+    
     if (selectedTool === 'select') return
     
     // Prevent creating new objects while already drawing
@@ -255,73 +311,80 @@ const CanvasPage: React.FC = () => {
 
   const renderObject = (obj: CanvasObject) => {
     const props = obj.properties
+    const isSelected = selectedObjectId === obj.id
+    const isEditing = editingObjectId === obj.id
+    const isHovered = hoveredObjectId === obj.id
 
     switch (obj.object_type) {
       case 'rectangle':
         return (
-          <Rect
-            key={obj.id}
-            x={props.x}
-            y={props.y}
-            width={props.width}
-            height={props.height}
-            fill={props.fill}
-            stroke={props.stroke}
-            strokeWidth={props.strokeWidth}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
-          />
+          <Group key={obj.id}>
+            <Rect
+              x={props.x}
+              y={props.y}
+              width={props.width}
+              height={props.height}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize} 
+            />
+          </Group>
         )
       case 'circle':
         return (
-          <Circle
-            key={obj.id}
-            x={props.x}
-            y={props.y}
-            radius={props.radius}
-            fill={props.fill}
-            stroke={props.stroke}
-            strokeWidth={props.strokeWidth}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
-          />
+          <Group key={obj.id}>
+            <Circle
+              x={props.x}
+              y={props.y}
+              radius={props.radius}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize} 
+            />
+          </Group>
         )
       case 'text':
         return (
-          <Text
+          <EditableText
             key={obj.id}
-            x={props.x}
-            y={props.y}
-            text={props.text}
-            fontSize={props.fontSize}
-            fill={props.fill}
-            fontFamily={props.fontFamily}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
+            object={obj}
+            isSelected={isSelected}
+            isEditing={isEditing}
+            onStartEdit={handleStartTextEdit}
+            onEndEdit={handleEndTextEdit}
+            onSelect={handleObjectSelect}
+            onUpdatePosition={handleObjectUpdatePosition}
+            selectedTool={selectedTool}
           />
         )
       default:
