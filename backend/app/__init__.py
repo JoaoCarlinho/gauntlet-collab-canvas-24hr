@@ -27,6 +27,15 @@ def create_app(config_class=Config):
         "https://*.vercel.app"
     ]
     
+    # Initialize CORS with comprehensive configuration
+    cors.init_app(
+        app, 
+        origins=allowed_origins, 
+        supports_credentials=True,
+        allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    )
+    
     socketio.init_app(
         app, 
         cors_allowed_origins=allowed_origins, 
@@ -38,7 +47,6 @@ def create_app(config_class=Config):
         max_http_buffer_size=1000000,
         always_connect=True
     )
-    cors.init_app(app, origins=allowed_origins, supports_credentials=True)
     migrate.init_app(app, db)
     
     # Initialize Swagger

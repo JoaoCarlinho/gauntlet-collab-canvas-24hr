@@ -179,13 +179,6 @@ def get_invitation_details(invitation_id):
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    try:
-        invitations = collaboration_service.get_user_invitations(current_user.email)
-        return jsonify({
-            'invitations': [invitation.to_dict() for invitation in invitations]
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @collaboration_bp.route('/invitations/<invitation_id>/accept', methods=['POST'])
 @require_auth
@@ -298,20 +291,3 @@ def remove_collaborator(current_user, canvas_id, user_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@collaboration_bp.route('/canvas/<canvas_id>/invitations', methods=['GET'])
-@require_auth
-def get_canvas_invitations(current_user, canvas_id):
-    """Get all pending invitations for a canvas."""
-    try:
-        # Check if user is owner
-        canvas = canvas_service.get_canvas_by_id(canvas_id)
-        if not canvas or canvas.owner_id != current_user.id:
-            return jsonify({'error': 'Only the owner can view invitations'}), 403
-        
-        invitations = collaboration_service.get_canvas_pending_invitations(canvas_id)
-        return jsonify({
-            'invitations': [invitation.to_dict() for invitation in invitations]
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
