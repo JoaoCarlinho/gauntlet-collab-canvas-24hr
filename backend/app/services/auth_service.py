@@ -19,7 +19,7 @@ class AuthService:
                 from firebase_admin import auth, credentials
                 
                 # Debug: Check Firebase environment variables
-                print("Firebase environment variables check:")
+                print("=== Firebase Initialization Debug ===")
                 print(f"FIREBASE_PROJECT_ID: {'SET' if os.environ.get('FIREBASE_PROJECT_ID') else 'NOT SET'}")
                 print(f"FIREBASE_CLIENT_EMAIL: {'SET' if os.environ.get('FIREBASE_CLIENT_EMAIL') else 'NOT SET'}")
                 private_key_raw = os.environ.get('FIREBASE_PRIVATE_KEY', '')
@@ -54,44 +54,41 @@ class AuthService:
                     print(f"Formatted private key starts with: {private_key[:50]}...")
                     print(f"Formatted private key ends with: ...{private_key[-50:]}")
                 
-                # Check if Firebase is already initialized
+                # Force reinitialize Firebase with properly formatted private key
                 try:
+                    # Delete existing app if it exists
                     existing_app = firebase_admin.get_app()
-                    print("Firebase already initialized")
-                    
-                    # If Firebase is already initialized but we have a formatted private key,
-                    # we might need to reinitialize with the correct key
-                    if private_key and '\\n' not in private_key and '\n' in private_key:
-                        print("Private key appears to be properly formatted, Firebase should work")
-                    else:
-                        print("Warning: Private key may not be properly formatted")
-                        
+                    firebase_admin.delete_app(existing_app)
+                    print("Deleted existing Firebase app to reinitialize")
                 except ValueError:
-                    # Initialize Firebase with service account
-                    firebase_config = {
-                        "type": "service_account",
-                        "project_id": os.environ.get('FIREBASE_PROJECT_ID'),
-                        "private_key_id": os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
-                        "private_key": private_key,
-                        "client_email": os.environ.get('FIREBASE_CLIENT_EMAIL'),
-                        "client_id": os.environ.get('FIREBASE_CLIENT_ID'),
-                        "auth_uri": os.environ.get('FIREBASE_AUTH_URI'),
-                        "token_uri": os.environ.get('FIREBASE_TOKEN_URI'),
-                        "auth_provider_x509_cert_url": os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL'),
-                        "client_x509_cert_url": os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
-                    }
-                    
-                    # Check if all required fields are present
-                    required_fields = ['project_id', 'private_key', 'client_email']
-                    missing_fields = [field for field in required_fields if not firebase_config.get(field)]
-                    
-                    if missing_fields:
-                        print(f"Missing Firebase environment variables: {missing_fields}")
-                        raise Exception(f"Missing Firebase environment variables: {missing_fields}")
-                    
-                    cred = credentials.Certificate(firebase_config)
-                    firebase_admin.initialize_app(cred)
-                    print("Firebase initialized successfully")
+                    print("No existing Firebase app found")
+                
+                # Initialize Firebase with service account
+                firebase_config = {
+                    "type": "service_account",
+                    "project_id": os.environ.get('FIREBASE_PROJECT_ID'),
+                    "private_key_id": os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
+                    "private_key": private_key,
+                    "client_email": os.environ.get('FIREBASE_CLIENT_EMAIL'),
+                    "client_id": os.environ.get('FIREBASE_CLIENT_ID'),
+                    "auth_uri": os.environ.get('FIREBASE_AUTH_URI'),
+                    "token_uri": os.environ.get('FIREBASE_TOKEN_URI'),
+                    "auth_provider_x509_cert_url": os.environ.get('FIREBASE_AUTH_PROVIDER_X509_CERT_URL'),
+                    "client_x509_cert_url": os.environ.get('FIREBASE_CLIENT_X509_CERT_URL'),
+                }
+                
+                # Check if all required fields are present
+                required_fields = ['project_id', 'private_key', 'client_email']
+                missing_fields = [field for field in required_fields if not firebase_config.get(field)]
+                
+                if missing_fields:
+                    print(f"Missing Firebase environment variables: {missing_fields}")
+                    raise Exception(f"Missing Firebase environment variables: {missing_fields}")
+                
+                cred = credentials.Certificate(firebase_config)
+                firebase_admin.initialize_app(cred)
+                print("Firebase initialized successfully with formatted private key")
+                print("=== Firebase Initialization Complete ===")
             else:
                 # Mock Firebase for testing
                 self._mock_firebase = True
