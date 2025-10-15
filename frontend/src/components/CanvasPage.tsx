@@ -20,6 +20,7 @@ import SelectionIndicator from './SelectionIndicator'
 import CursorTooltip from './CursorTooltip'
 import PointerIndicator from './PointerIndicator'
 import { getUserColor, getUserInitials, getCursorIcon } from '../utils/cursorUtils'
+import { getCursorManager, CursorState } from '../utils/cursorManager'
 import { FloatingToolbar, useToolbarState, useToolShortcuts, getToolById } from './toolbar'
 
 const CanvasPage: React.FC = () => {
@@ -67,6 +68,9 @@ const CanvasPage: React.FC = () => {
     position: { x: number; y: number }
     startPosition?: { x: number; y: number }
   } | null>(null)
+  
+  // Cursor management
+  const [cursorManager] = useState(() => getCursorManager())
   
   const idToken = localStorage.getItem('idToken')
   
@@ -121,7 +125,7 @@ const CanvasPage: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isDrawing, editingObjectId, selectedObjectId])
 
-  // Handle tool selection changes for pointer indicators
+  // Handle tool selection changes for pointer indicators and cursor
   useEffect(() => {
     const toolsWithIndicators = ['heart', 'star', 'diamond', 'line', 'arrow']
     
@@ -135,7 +139,10 @@ const CanvasPage: React.FC = () => {
     } else {
       setPointerIndicator(null)
     }
-  }, [selectedTool.id])
+
+    // Update cursor based on selected tool
+    cursorManager.handleToolSelection(selectedTool.id)
+  }, [selectedTool.id, cursorManager])
 
   const loadCanvas = async () => {
     try {
@@ -236,6 +243,14 @@ const CanvasPage: React.FC = () => {
     if (idToken) {
       await socketService.updateObject(canvasId!, idToken, objectId, { x, y })
     }
+  }
+
+  const handleCursorChange = (_cursor: CursorState) => {
+    // Cursor is managed by cursorManager, no local state needed
+  }
+
+  const handleCursorReset = () => {
+    cursorManager.resetCursor()
   }
 
   // Cursor tooltip handlers
@@ -532,7 +547,9 @@ const CanvasPage: React.FC = () => {
             <ResizeHandles 
               object={obj} 
               isSelected={isSelected} 
-              onResize={handleObjectResize} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
             />
           </Group>
         )
@@ -560,7 +577,9 @@ const CanvasPage: React.FC = () => {
             <ResizeHandles 
               object={obj} 
               isSelected={isSelected} 
-              onResize={handleObjectResize} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
             />
           </Group>
         )
@@ -577,6 +596,197 @@ const CanvasPage: React.FC = () => {
             onUpdatePosition={handleObjectUpdatePosition}
             selectedTool={selectedTool.id}
           />
+        )
+      case 'heart':
+        return (
+          <Group key={obj.id}>
+            <Group x={props.x} y={props.y}>
+              <Circle
+                x={-props.width * 0.3}
+                y={-props.height * 0.2}
+                radius={props.width * 0.2}
+                fill={props.fill}
+                stroke={props.stroke}
+                strokeWidth={props.strokeWidth}
+                draggable={selectedTool.id === 'select' && !isEditing}
+                onClick={() => handleObjectSelect(obj.id)}
+                onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+                onMouseEnter={() => setHoveredObjectId(obj.id)}
+                onMouseLeave={() => setHoveredObjectId(null)}
+              />
+              <Circle
+                x={props.width * 0.3}
+                y={-props.height * 0.2}
+                radius={props.width * 0.2}
+                fill={props.fill}
+                stroke={props.stroke}
+                strokeWidth={props.strokeWidth}
+              />
+              <RegularPolygon
+                x={0}
+                y={props.height * 0.3}
+                sides={3}
+                radius={props.width * 0.3}
+                rotation={180}
+                fill={props.fill}
+                stroke={props.stroke}
+                strokeWidth={props.strokeWidth}
+              />
+            </Group>
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
+            />
+          </Group>
+        )
+      case 'star':
+        return (
+          <Group key={obj.id}>
+            <RegularPolygon
+              x={props.x}
+              y={props.y}
+              sides={5}
+              radius={props.width / 2}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
+            />
+          </Group>
+        )
+      case 'diamond':
+        return (
+          <Group key={obj.id}>
+            <RegularPolygon
+              x={props.x}
+              y={props.y}
+              sides={4}
+              radius={props.width / 2}
+              rotation={45}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
+            />
+          </Group>
+        )
+      case 'line':
+        return (
+          <Group key={obj.id}>
+            <Line
+              x={props.x}
+              y={props.y}
+              points={props.points || [0, 0, 100, 0]}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
+            />
+          </Group>
+        )
+      case 'arrow':
+        return (
+          <Group key={obj.id}>
+            <Group
+              x={props.x}
+              y={props.y}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            >
+              <Line
+                x={0}
+                y={0}
+                points={props.points || [0, 0, 100, 0]}
+                stroke={props.stroke}
+                strokeWidth={props.strokeWidth}
+              />
+              {props.points && props.points.length >= 4 && (
+                <Group
+                  x={props.points[2]}
+                  y={props.points[3]}
+                  rotation={Math.atan2(props.points[3], props.points[2]) * (180 / Math.PI)}
+                >
+                  <Line
+                    x={0}
+                    y={0}
+                    points={[-15, -8, 0, 0, -15, 8]}
+                    stroke={props.stroke}
+                    strokeWidth={props.strokeWidth}
+                  />
+                </Group>
+              )}
+            </Group>
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize}
+              onCursorChange={handleCursorChange}
+              onCursorReset={handleCursorReset}
+            />
+          </Group>
         )
       default:
         return null
