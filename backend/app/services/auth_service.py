@@ -129,12 +129,21 @@ class AuthService:
         """Register a new user."""
         decoded_token = self.verify_token(id_token)
         
+        print(f"=== User Registration Debug ===")
+        print(f"Decoded token UID: {decoded_token['uid']}")
+        print(f"Decoded token email: {decoded_token.get('email', '')}")
+        print(f"Decoded token name: {decoded_token.get('name', '')}")
+        print(f"Decoded token picture: {decoded_token.get('picture', '')}")
+        
         # Check if user already exists
         existing_user = User.query.filter_by(id=decoded_token['uid']).first()
+        print(f"Existing user found: {existing_user is not None}")
         if existing_user:
+            print(f"Returning existing user: {existing_user.email}")
             return existing_user
         
         # Create new user
+        print("Creating new user...")
         user = User(
             id=decoded_token['uid'],
             email=decoded_token.get('email', ''),
@@ -142,8 +151,17 @@ class AuthService:
             avatar_url=decoded_token.get('picture', '')
         )
         
+        print(f"User object created: {user}")
         db.session.add(user)
-        db.session.commit()
+        print("User added to session")
+        
+        try:
+            db.session.commit()
+            print("User committed to database successfully")
+        except Exception as e:
+            print(f"Database commit failed: {str(e)}")
+            db.session.rollback()
+            raise e
         
         return user
     
