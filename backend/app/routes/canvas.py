@@ -2,6 +2,10 @@ from flask import Blueprint, request, jsonify
 from flasgger import swag_from
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
+from app.schemas.validation_schemas import CanvasCreateSchema, CanvasUpdateSchema
+from app.middleware.rate_limiting import canvas_rate_limit
+from app.utils.validators import ValidationError
+from app.services.sanitization_service import SanitizationService
 
 canvas_bp = Blueprint('canvas', __name__)
 canvas_service = CanvasService()
@@ -64,6 +68,7 @@ def get_canvases(current_user):
 @canvas_bp.route('/', methods=['POST'])
 @canvas_bp.route('', methods=['POST'])
 @require_auth
+@canvas_rate_limit('create')
 @swag_from({
     'tags': ['Canvas'],
     'summary': 'Create a new canvas',
@@ -139,17 +144,25 @@ def get_canvases(current_user):
 def create_canvas(current_user):
     """Create a new canvas."""
     try:
-        print(f"=== Canvas Creation Debug ===")
-        print(f"Current user ID: {current_user.id}")
-        print(f"Current user email: {current_user.email}")
-        
         data = request.get_json()
-        title = data.get('title')
-        description = data.get('description', '')
-        is_public = data.get('is_public', False)
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
         
-        if not title:
-            return jsonify({'error': 'Title is required'}), 400
+        # Validate input using schema
+        schema = CanvasCreateSchema()
+        try:
+            validated_data = schema.load(data)
+        except ValidationError as e:
+            return jsonify({'error': 'Validation failed', 'details': e.messages}), 400
+        
+        title = validated_data['title']
+        description = validated_data.get('description', '')
+        is_public = validated_data.get('is_public', False)
+        
+        # Sanitize content
+        title = SanitizationService.sanitize_canvas_title(title)
+        if description:
+            description = SanitizationService.sanitize_canvas_description(description)
         
         canvas = canvas_service.create_canvas(
             title=title,

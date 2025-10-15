@@ -2,6 +2,10 @@ from flask_socketio import emit, join_room, leave_room
 from app.services.auth_service import AuthService
 from app.extensions import redis_client
 from app.utils.logger import SmartLogger
+from app.schemas.validation_schemas import CursorMoveEventSchema
+from app.middleware.rate_limiting import check_socket_rate_limit
+from app.utils.validators import ValidationError
+from app.services.sanitization_service import SanitizationService
 import json
 
 def register_cursor_handlers(socketio):
@@ -56,18 +60,32 @@ def register_cursor_handlers(socketio):
     def handle_cursor_move(data):
         """Handle cursor movement with reduced logging."""
         try:
-            canvas_id = data.get('canvas_id')
-            id_token = data.get('id_token')
-            position = data.get('position')
+            # Sanitize input data
+            sanitized_data = SanitizationService.sanitize_socket_event_data(data)
             
-            if not all([canvas_id, id_token, position]):
+            # Validate input using schema
+            schema = CursorMoveEventSchema()
+            try:
+                validated_data = schema.load(sanitized_data)
+            except ValidationError as e:
+                cursor_logger.log_error(f"Cursor move validation failed: {e.messages}")
                 return
+            
+            canvas_id = validated_data['canvas_id']
+            id_token = validated_data['id_token']
+            position = validated_data['position']
+            timestamp = validated_data.get('timestamp')
             
             # Verify authentication (with reduced logging)
             try:
                 user = authenticate_socket_user_quiet(id_token)
             except Exception as e:
                 cursor_logger.log_error(f"Cursor authentication failed", e)
+                return
+            
+            # Check rate limiting
+            if not check_socket_rate_limit(user.id, 'cursor_move'):
+                cursor_logger.log_error(f"Cursor move rate limit exceeded for user {user.id}")
                 return
             
             # Log cursor movement (rate limited)
@@ -79,7 +97,7 @@ def register_cursor_handlers(socketio):
                     'user_id': user.id,
                     'user_name': user.name,
                     'position': position,
-                    'timestamp': data.get('timestamp')
+                    'timestamp': timestamp
                 }
                 redis_client.setex(
                     f'cursor:{canvas_id}:{user.id}',
@@ -92,9 +110,11 @@ def register_cursor_handlers(socketio):
                 'user_id': user.id,
                 'user_name': user.name,
                 'position': position,
-                'timestamp': data.get('timestamp')
+                'timestamp': timestamp
             }, room=canvas_id, include_self=False)
             
+        except ValidationError as e:
+            cursor_logger.log_error(f"Cursor move validation failed: {e.messages}")
         except Exception as e:
             cursor_logger.log_error(f"Cursor move handler error", e)
             emit('error', {'message': str(e)})

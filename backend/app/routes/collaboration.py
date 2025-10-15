@@ -3,6 +3,10 @@ from flasgger import swag_from
 from app.services.collaboration_service import CollaborationService
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
+from app.schemas.validation_schemas import CollaborationInviteSchema, PresenceUpdateSchema
+from app.middleware.rate_limiting import collaboration_rate_limit
+from app.utils.validators import ValidationError
+from app.services.sanitization_service import SanitizationService
 
 collaboration_bp = Blueprint('collaboration', __name__)
 collaboration_service = CollaborationService()
@@ -10,6 +14,7 @@ canvas_service = CanvasService()
 
 @collaboration_bp.route('/invite', methods=['POST'])
 @require_auth
+@collaboration_rate_limit('invite')
 @swag_from({
     'tags': ['Collaboration'],
     'summary': 'Invite a user to collaborate on a canvas',
@@ -89,11 +94,23 @@ def invite_user(current_user):
     """Invite a user to collaborate on a canvas."""
     try:
         data = request.get_json()
-        canvas_id = data.get('canvas_id')
-        invitee_email = data.get('invitee_email')
-        permission_type = data.get('permission_type', 'view')
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
         
-        if not all([canvas_id, invitee_email]):
+        # Validate input using schema
+        schema = CollaborationInviteSchema()
+        try:
+            validated_data = schema.load(data)
+        except ValidationError as e:
+            return jsonify({'error': 'Validation failed', 'details': e.messages}), 400
+        
+        canvas_id = validated_data['canvas_id']
+        invitee_email = validated_data['invitee_email']
+        permission_type = validated_data['permission_type']
+        invitation_message = validated_data.get('invitation_message')
+        
+        # Additional validation
+        if not canvas_id or not invitee_email:
             return jsonify({'error': 'canvas_id and invitee_email are required'}), 400
         
         # Check if user is owner
@@ -101,16 +118,16 @@ def invite_user(current_user):
         if not canvas or canvas.owner_id != current_user.id:
             return jsonify({'error': 'Only the owner can invite users'}), 403
         
-        # Validate permission type
-        valid_permissions = ['view', 'edit']
-        if permission_type not in valid_permissions:
-            return jsonify({'error': f'Invalid permission type. Must be one of: {valid_permissions}'}), 400
+        # Sanitize invitation message if provided
+        if invitation_message:
+            invitation_message = SanitizationService.sanitize_invitation_message(invitation_message)
         
         invitation = collaboration_service.invite_user_to_canvas(
             canvas_id=canvas_id,
             inviter_id=current_user.id,
             invitee_email=invitee_email,
-            permission_type=permission_type
+            permission_type=permission_type,
+            invitation_message=invitation_message
         )
         
         return jsonify({
@@ -118,8 +135,10 @@ def invite_user(current_user):
             'invitation': invitation.to_dict()
         }), 201
         
+    except ValidationError as e:
+        return jsonify({'error': 'Validation failed', 'details': str(e)}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 @collaboration_bp.route('/invitations', methods=['GET'])
 @require_auth

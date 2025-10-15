@@ -31,6 +31,23 @@ class Config:
     # Logging Levels
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     CURSOR_LOG_LEVEL = os.environ.get('CURSOR_LOG_LEVEL', 'WARNING')  # Reduce cursor spam
+    
+    # Security Configuration
+    RATE_LIMIT_STORAGE_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    VALIDATION_STRICT_MODE = os.environ.get('VALIDATION_STRICT_MODE', 'true').lower() == 'true'
+    SANITIZATION_LEVEL = os.environ.get('SANITIZATION_LEVEL', 'strict')
+    
+    # Rate Limiting Configuration
+    RATE_LIMIT_ENABLED = os.environ.get('RATE_LIMIT_ENABLED', 'true').lower() == 'true'
+    RATE_LIMIT_DEFAULT = os.environ.get('RATE_LIMIT_DEFAULT', '100 per minute')
+    
+    # Input Validation Configuration
+    MAX_EMAIL_LENGTH = int(os.environ.get('MAX_EMAIL_LENGTH', '255'))
+    MAX_TITLE_LENGTH = int(os.environ.get('MAX_TITLE_LENGTH', '255'))
+    MAX_DESCRIPTION_LENGTH = int(os.environ.get('MAX_DESCRIPTION_LENGTH', '2000'))
+    MAX_MESSAGE_LENGTH = int(os.environ.get('MAX_MESSAGE_LENGTH', '1000'))
+    MAX_TEXT_CONTENT_LENGTH = int(os.environ.get('MAX_TEXT_CONTENT_LENGTH', '5000'))
 
 class DevelopmentConfig(Config):
     DEBUG = True

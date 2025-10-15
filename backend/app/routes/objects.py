@@ -2,6 +2,10 @@ from flask import Blueprint, request, jsonify
 from flasgger import swag_from
 from app.services.canvas_service import CanvasService
 from app.services.auth_service import require_auth
+from app.schemas.validation_schemas import CanvasObjectSchema
+from app.middleware.rate_limiting import object_rate_limit
+from app.utils.validators import ValidationError
+from app.services.sanitization_service import SanitizationService
 import json
 
 objects_bp = Blueprint('objects', __name__)
@@ -9,6 +13,7 @@ canvas_service = CanvasService()
 
 @objects_bp.route('/', methods=['POST'])
 @require_auth
+@object_rate_limit('create')
 @swag_from({
     'tags': ['Objects'],
     'summary': 'Create a new canvas object',
@@ -99,24 +104,29 @@ def create_object(current_user):
     """Create a new canvas object."""
     try:
         data = request.get_json()
-        canvas_id = data.get('canvas_id')
-        object_type = data.get('object_type')
-        properties = data.get('properties', {})
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
         
-        if not all([canvas_id, object_type]):
-            return jsonify({'error': 'canvas_id and object_type are required'}), 400
+        # Validate input using schema
+        schema = CanvasObjectSchema()
+        try:
+            validated_data = schema.load(data)
+        except ValidationError as e:
+            return jsonify({'error': 'Validation failed', 'details': e.messages}), 400
+        
+        canvas_id = validated_data['canvas_id']
+        object_type = validated_data['object_type']
+        properties = validated_data['properties']
         
         # Check permission
         if not canvas_service.check_canvas_permission(canvas_id, current_user.id, 'edit'):
             return jsonify({'error': 'Edit permission required'}), 403
         
-        # Validate object type
-        valid_types = ['rectangle', 'circle', 'text']
-        if object_type not in valid_types:
-            return jsonify({'error': f'Invalid object type. Must be one of: {valid_types}'}), 400
+        # Sanitize object properties
+        sanitized_properties = SanitizationService.sanitize_object_properties(properties)
         
         # Convert properties to JSON string
-        properties_json = json.dumps(properties)
+        properties_json = json.dumps(sanitized_properties)
         
         canvas_object = canvas_service.create_canvas_object(
             canvas_id=canvas_id,
@@ -130,8 +140,10 @@ def create_object(current_user):
             'object': canvas_object.to_dict()
         }), 201
         
+    except ValidationError as e:
+        return jsonify({'error': 'Validation failed', 'details': str(e)}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Internal server error'}), 500
 
 @objects_bp.route('/<object_id>', methods=['GET'])
 @require_auth

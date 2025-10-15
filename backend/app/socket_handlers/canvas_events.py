@@ -2,6 +2,10 @@ from flask_socketio import emit, join_room, leave_room
 from app.services.auth_service import AuthService
 from app.services.canvas_service import CanvasService
 from app.extensions import redis_client
+from app.schemas.validation_schemas import ObjectUpdateEventSchema
+from app.middleware.rate_limiting import check_socket_rate_limit
+from app.utils.validators import ValidationError
+from app.services.sanitization_service import SanitizationService
 import json
 
 def register_canvas_handlers(socketio):
@@ -154,14 +158,21 @@ def register_canvas_handlers(socketio):
     def handle_object_updated(data):
         """Handle canvas object update."""
         try:
-            canvas_id = data.get('canvas_id')
-            id_token = data.get('id_token')
-            object_id = data.get('object_id')
-            properties = data.get('properties')
+            # Sanitize input data
+            sanitized_data = SanitizationService.sanitize_socket_event_data(data)
             
-            if not all([canvas_id, id_token, object_id, properties]):
-                emit('error', {'message': 'canvas_id, id_token, object_id, and properties are required'})
+            # Validate input using schema
+            schema = ObjectUpdateEventSchema()
+            try:
+                validated_data = schema.load(sanitized_data)
+            except ValidationError as e:
+                emit('error', {'message': 'Validation failed', 'details': e.messages})
                 return
+            
+            canvas_id = validated_data['canvas_id']
+            id_token = validated_data['id_token']
+            object_id = validated_data['object_id']
+            properties = validated_data['properties']
             
             # Verify authentication
             auth_service = AuthService()
@@ -172,16 +183,24 @@ def register_canvas_handlers(socketio):
                 emit('error', {'message': f'Authentication failed: {str(e)}'})
                 return
             
+            # Check rate limiting
+            if not check_socket_rate_limit(user.id, 'object_updated'):
+                emit('error', {'message': 'Rate limit exceeded for object updates'})
+                return
+            
             # Check edit permission
             canvas_service = CanvasService()
             if not canvas_service.check_canvas_permission(canvas_id, user.id, 'edit'):
                 emit('error', {'message': 'Edit permission required'})
                 return
             
+            # Sanitize object properties
+            sanitized_properties = SanitizationService.sanitize_object_properties(properties)
+            
             # Update object in database
             updated_object = canvas_service.update_canvas_object(
                 object_id=object_id,
-                properties=json.dumps(properties)
+                properties=json.dumps(sanitized_properties)
             )
             
             if updated_object:
@@ -190,8 +209,10 @@ def register_canvas_handlers(socketio):
                     'object': updated_object.to_dict()
                 }, room=canvas_id, include_self=True)
             
+        except ValidationError as e:
+            emit('error', {'message': 'Validation failed', 'details': str(e)})
         except Exception as e:
-            emit('error', {'message': str(e)})
+            emit('error', {'message': 'Internal server error'})
     
     @socketio.on('object_deleted')
     def handle_object_deleted(data):

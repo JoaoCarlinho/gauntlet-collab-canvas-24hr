@@ -107,6 +107,12 @@ def create_app(config_class=Config):
     app.register_blueprint(objects_bp, url_prefix='/api/objects')
     app.register_blueprint(collaboration_bp, url_prefix='/api/collaboration')
     
+    # Initialize rate limiting
+    from .middleware.rate_limiting import init_rate_limiting, init_socket_rate_limiting
+    from .extensions import redis_client
+    init_rate_limiting(app)
+    init_socket_rate_limiting(redis_client)
+    
     # Register socket handlers
     from .socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
