@@ -4,6 +4,9 @@ import { getApiUrl } from '../utils/env'
 
 const API_URL = getApiUrl()
 
+console.log('API Service initialized with URL:', API_URL)
+console.log('Full baseURL will be:', `${API_URL}/api`)
+
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   headers: {
@@ -18,7 +21,16 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  console.log('Making API request to:', (config.baseURL || '') + (config.url || ''))
+  
+  const fullUrl = (config.baseURL || '') + (config.url || '')
+  console.log('Making API request to:', fullUrl)
+  console.log('Request config:', {
+    baseURL: config.baseURL,
+    url: config.url,
+    method: config.method,
+    headers: config.headers
+  })
+  
   return config
 })
 
