@@ -98,6 +98,10 @@ const getAuthErrorMessage = (error: AuthError): string => {
 export const signInWithGooglePopup = async (): Promise<User> => {
   try {
     console.log('Attempting Google sign-in with popup...')
+    console.log('Current auth state before popup:', {
+      hasCurrentUser: !!auth.currentUser,
+      hasLocalToken: !!localStorage.getItem('idToken')
+    })
     
     // Check for FedCM compatibility issues
     if (typeof window !== 'undefined' && 'navigator' in window) {
@@ -111,6 +115,16 @@ export const signInWithGooglePopup = async (): Promise<User> => {
     
     const result = await signInWithPopup(auth, googleProvider)
     console.log('Google sign-in successful via popup')
+    console.log('User after popup:', {
+      uid: result.user.uid,
+      email: result.user.email,
+      displayName: result.user.displayName
+    })
+    console.log('Auth state after popup:', {
+      hasCurrentUser: !!auth.currentUser,
+      currentUserUid: auth.currentUser?.uid
+    })
+    
     return result.user
   } catch (error) {
     console.error('Popup sign-in failed:', error)
@@ -296,7 +310,10 @@ export const isUserAuthenticated = (): boolean => {
   console.log('Auth check:', {
     hasFirebaseUser: !!currentUser,
     hasStoredToken: !!hasToken,
-    userEmail: currentUser?.email
+    userEmail: currentUser?.email,
+    userUid: currentUser?.uid,
+    tokenLength: hasToken ? hasToken.length : 0,
+    timestamp: new Date().toISOString()
   })
   
   return !!(currentUser && hasToken)

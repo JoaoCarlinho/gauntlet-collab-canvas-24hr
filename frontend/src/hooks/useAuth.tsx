@@ -245,13 +245,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       console.log('=== Firebase auth state changed ===')
       console.log('Firebase user:', firebaseUser ? 'Present' : 'Null')
+      console.log('Current timestamp:', new Date().toISOString())
       
       if (firebaseUser) {
         console.log('User details from Firebase:', {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
-          emailVerified: firebaseUser.emailVerified
+          emailVerified: firebaseUser.emailVerified,
+          metadata: {
+            creationTime: firebaseUser.metadata.creationTime,
+            lastSignInTime: firebaseUser.metadata.lastSignInTime
+          }
         })
         
         try {
@@ -293,6 +298,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } else {
         console.log('No Firebase user - clearing auth state')
+        console.log('Auth state change reason: Firebase user became null')
+        console.log('Current auth state before clearing:', {
+          hasLocalToken: !!localStorage.getItem('idToken'),
+          reactUser: user,
+          reactAuthenticated: isAuthenticated
+        })
+        
         localStorage.removeItem('idToken')
         setUser(null)
         setIsAuthenticated(false)
