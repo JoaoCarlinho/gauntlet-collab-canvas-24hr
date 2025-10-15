@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Users, Eye, Edit3 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
@@ -13,12 +13,59 @@ const HomePage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newCanvasTitle, setNewCanvasTitle] = useState('')
   const [newCanvasDescription, setNewCanvasDescription] = useState('')
+  const modalRef = useRef<HTMLDivElement>(null)
+  const titleInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (isAuthenticated) {
       loadCanvases()
     }
   }, [isAuthenticated])
+
+  // Handle keyboard navigation for modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (showCreateModal) {
+        if (event.key === 'Escape') {
+          setShowCreateModal(false)
+        } else if (event.key === 'Tab') {
+          // Trap focus within modal
+          const modal = modalRef.current
+          if (modal) {
+            const focusableElements = modal.querySelectorAll(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            )
+            const firstElement = focusableElements[0] as HTMLElement
+            const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+
+            if (event.shiftKey) {
+              if (document.activeElement === firstElement) {
+                event.preventDefault()
+                lastElement.focus()
+              }
+            } else {
+              if (document.activeElement === lastElement) {
+                event.preventDefault()
+                firstElement.focus()
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (showCreateModal) {
+      document.addEventListener('keydown', handleKeyDown)
+      // Focus the title input when modal opens
+      setTimeout(() => {
+        titleInputRef.current?.focus()
+      }, 100)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showCreateModal])
 
   const loadCanvases = async () => {
     try {
@@ -162,15 +209,23 @@ const HomePage: React.FC = () => {
 
       {/* Create Canvas Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="card p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Canvas</h3>
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-canvas-title"
+          aria-describedby="create-canvas-description"
+        >
+          <div ref={modalRef} className="card p-6 w-full max-w-md">
+            <h3 id="create-canvas-title" className="text-lg font-medium text-gray-900 mb-4">Create New Canvas</h3>
+            <p id="create-canvas-description" className="sr-only">Create a new collaborative canvas with a title and optional description</p>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Title
                 </label>
                 <input
+                  ref={titleInputRef}
                   type="text"
                   value={newCanvasTitle}
                   onChange={(e) => setNewCanvasTitle(e.target.value)}
