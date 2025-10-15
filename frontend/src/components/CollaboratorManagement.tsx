@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Users, Mail, Clock, CheckCircle, XCircle, MoreVertical, Trash2, Edit3 } from 'lucide-react'
+import { Users, Mail, Clock, CheckCircle, XCircle, MoreVertical, Trash2 } from 'lucide-react'
 import { collaborationAPI } from '../services/api'
 import toast from 'react-hot-toast'
 

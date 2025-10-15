@@ -28,7 +28,6 @@ const CanvasPage: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false)
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
-  const [showCollaboratorPanel, setShowCollaboratorPanel] = useState(false)
   const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
   
   const stageRef = useRef<any>(null)
@@ -140,9 +139,7 @@ const CanvasPage: React.FC = () => {
       toast(`${data.user_name} left the canvas`)
     })
 
-    socketService.on('online_users', (data: { users: OnlineUser[] }) => {
-      setOnlineUsers(data.users)
-    })
+    // Online users are now handled by PresenceIndicators component
   }
 
   const handleStageClick = (e: any) => {

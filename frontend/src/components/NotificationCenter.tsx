@@ -2,15 +2,12 @@ import React, { useState, useRef, useEffect } from 'react'
 import { 
   Bell, 
   X, 
-  Check, 
   CheckCheck, 
   Trash2, 
   Info, 
   CheckCircle, 
   AlertTriangle, 
-  XCircle,
-  ChevronDown,
-  ChevronUp
+  XCircle
 } from 'lucide-react'
 import { useNotifications, Notification } from '../hooks/useNotifications'
 
@@ -29,7 +26,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' 
   } = useNotifications()
 
   const [isOpen, setIsOpen] = useState(false)
-  const [expandedNotification, setExpandedNotification] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -97,12 +93,6 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ className = '' 
     if (notification.action) {
       notification.action.onClick()
     }
-  }
-
-  const toggleExpanded = (notificationId: string) => {
-    setExpandedNotification(
-      expandedNotification === notificationId ? null : notificationId
-    )
   }
 
   return (

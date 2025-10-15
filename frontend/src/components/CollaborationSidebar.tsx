@@ -2,12 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { 
   Users, 
   UserPlus, 
-  Settings, 
   Bell, 
-  MessageSquare, 
   Activity,
-  ChevronRight,
-  ChevronDown,
   Eye,
   Edit3,
   Clock,
@@ -64,8 +60,6 @@ const CollaborationSidebar: React.FC<CollaborationSidebarProps> = ({
   const [invitations, setInvitations] = useState<Invitation[]>([])
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['presence']))
-
   useEffect(() => {
     if (isOpen) {
       loadCollaborationData()
@@ -89,16 +83,6 @@ const CollaborationSidebar: React.FC<CollaborationSidebarProps> = ({
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const toggleSection = (section: string) => {
-    const newExpanded = new Set(expandedSections)
-    if (newExpanded.has(section)) {
-      newExpanded.delete(section)
-    } else {
-      newExpanded.add(section)
-    }
-    setExpandedSections(newExpanded)
   }
 
   const getStatusIcon = (status: string) => {

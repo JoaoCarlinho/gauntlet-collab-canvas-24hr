@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Mail, User, MessageSquare, Send } from 'lucide-react'
+import { X, Mail, MessageSquare, Send } from 'lucide-react'
 import { collaborationAPI } from '../services/api'
 import toast from 'react-hot-toast'
 
