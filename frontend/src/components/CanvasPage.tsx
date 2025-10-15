@@ -40,7 +40,6 @@ const CanvasPage: React.FC = () => {
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
   const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
   
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)

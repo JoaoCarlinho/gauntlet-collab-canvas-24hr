@@ -152,7 +152,7 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
     props.radius = newRadius
   }
 
-  const handleTextResize = (props: any, handleType: string, deltaX: number, deltaY: number) => {
+  const handleTextResize = (props: any, handleType: string, deltaX: number, _deltaY: number) => {
     if (handleType === 'e') {
       // Adjust font size based on horizontal resize
       const newFontSize = Math.max(8, Math.min(72, props.fontSize + deltaX * 0.3))

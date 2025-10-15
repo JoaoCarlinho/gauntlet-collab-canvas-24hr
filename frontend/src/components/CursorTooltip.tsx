@@ -55,7 +55,6 @@ const CursorTooltip: React.FC<CursorTooltipProps> = ({
   // Calculate tooltip position to avoid screen edges
   const getTooltipPosition = () => {
     const tooltipWidth = 200 // Approximate tooltip width
-    const tooltipHeight = 60 // Approximate tooltip height
     const padding = 10
 
     let x = position.x + 15
