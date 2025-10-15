@@ -23,9 +23,11 @@ declare global {
 }
 
 Cypress.Commands.add('login', () => {
-  // Mock Firebase auth for testing
+  // For production testing, we'll need to handle real authentication
+  // This is a placeholder - in a real scenario, you'd need to handle Google OAuth
   cy.window().then((win) => {
-    win.localStorage.setItem('idToken', 'valid-token')
+    // Set up mock authentication for testing
+    win.localStorage.setItem('idToken', 'mock-token-for-testing')
     win.localStorage.setItem('user', JSON.stringify({
       id: 'test-user-id',
       email: 'test@example.com',

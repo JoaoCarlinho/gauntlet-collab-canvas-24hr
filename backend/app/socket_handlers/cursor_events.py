@@ -6,6 +6,30 @@ import json
 def register_cursor_handlers(socketio):
     """Register cursor-related Socket.IO event handlers."""
     
+    def authenticate_socket_user(id_token):
+        """Authenticate user for Socket.IO events."""
+        try:
+            print(f"=== Socket.IO Cursor Authentication Debug ===")
+            print(f"Token length: {len(id_token) if id_token else 0}")
+            
+            auth_service = AuthService()
+            decoded_token = auth_service.verify_token(id_token)
+            print(f"Token verified for user: {decoded_token.get('uid', 'unknown')}")
+            
+            user = auth_service.get_user_by_id(decoded_token['uid'])
+            if not user:
+                print("User not found in database, registering...")
+                user = auth_service.register_user(id_token)
+                print(f"User registered: {user.email}")
+            else:
+                print(f"User found in database: {user.email}")
+            
+            return user
+        except Exception as e:
+            print(f"Socket.IO cursor authentication failed: {str(e)}")
+            print(f"Exception type: {type(e)}")
+            raise e
+    
     @socketio.on('cursor_move')
     def handle_cursor_move(data):
         """Handle cursor movement."""
@@ -18,11 +42,10 @@ def register_cursor_handlers(socketio):
                 return
             
             # Verify authentication
-            auth_service = AuthService()
             try:
-                decoded_token = auth_service.verify_token(id_token)
-                user = auth_service.get_user_by_id(decoded_token['uid'])
-            except Exception:
+                user = authenticate_socket_user(id_token)
+            except Exception as e:
+                print(f"Cursor authentication failed: {str(e)}")
                 return
             
             # Store cursor position in Redis for caching

@@ -8,6 +8,11 @@ class SocketService {
   connect(idToken: string) {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     
+    console.log('=== Socket.IO Connection Debug ===')
+    console.log('API URL:', API_URL)
+    console.log('Token length:', idToken.length)
+    console.log('Token starts with:', idToken.substring(0, 50) + '...')
+    
     this.socket = io(API_URL, {
       auth: {
         token: idToken
@@ -23,15 +28,24 @@ class SocketService {
     })
 
     this.socket.on('connect', () => {
-      console.log('Connected to server')
+      console.log('=== Socket.IO Connected Successfully ===')
+      console.log('Socket ID:', this.socket?.id)
     })
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server')
+    this.socket.on('disconnect', (reason) => {
+      console.log('=== Socket.IO Disconnected ===')
+      console.log('Reason:', reason)
+    })
+
+    this.socket.on('connect_error', (error) => {
+      console.error('=== Socket.IO Connection Error ===')
+      console.error('Error:', error)
+      console.error('Error message:', error.message)
     })
 
     this.socket.on('error', (error) => {
-      console.error('Socket error:', error)
+      console.error('=== Socket.IO Error ===')
+      console.error('Error:', error)
     })
 
     // Register event listeners

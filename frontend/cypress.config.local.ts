@@ -2,7 +2,7 @@ import { defineConfig } from 'cypress'
 
 export default defineConfig({
   e2e: {
-    baseUrl: 'http://localhost:3000',
+    baseUrl: 'https://gauntlet-collab-canvas-24hr.vercel.app',
     supportFile: 'cypress/support/e2e.ts',
     specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
     viewportWidth: 1280,
@@ -15,9 +15,9 @@ export default defineConfig({
     pageLoadTimeout: 30000,
     // Environment variables for testing
     env: {
-      API_URL: 'http://localhost:5000',
-      MOCK_AUTH: true,
-      MOCK_WEBSOCKET: true
+      API_URL: 'https://gauntlet-collab-canvas-24hr-production.up.railway.app',
+      MOCK_AUTH: false,
+      MOCK_WEBSOCKET: false
     },
     setupNodeEvents(on, config) {
       // Add custom tasks here if needed
