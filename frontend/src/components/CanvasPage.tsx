@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
-import { Canvas, CanvasObject, CursorData } from '../types'
+import { Canvas, CanvasObject, CursorData, DrawingTool } from '../types'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -19,6 +19,7 @@ import ResizeHandles from './ResizeHandles'
 import SelectionIndicator from './SelectionIndicator'
 import CursorTooltip from './CursorTooltip'
 import { getUserColor, getUserInitials, getCursorIcon } from '../utils/cursorUtils'
+import { FloatingToolbar, useToolbarState, useToolShortcuts, getToolById } from './toolbar'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -30,11 +31,23 @@ const CanvasPage: React.FC = () => {
   const [objects, setObjects] = useState<CanvasObject[]>([])
   const [cursors, setCursors] = useState<CursorData[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedTool, setSelectedTool] = useState<'select' | 'rectangle' | 'circle' | 'text'>('select')
   const [isDrawing, setIsDrawing] = useState(false)
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
+  
+  // Floating toolbar state
+  const {
+    preferences,
+    selectedTool,
+    isVisible: isToolbarVisible,
+    updatePreferences,
+    selectTool,
+    toggleVisibility: toggleToolbarVisibility,
+    updatePosition,
+    toggleCollapse,
+    getFilteredTools
+  } = useToolbarState()
   
   // New state for enhanced object interactions
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
@@ -47,6 +60,9 @@ const CanvasPage: React.FC = () => {
   const [showTooltip, setShowTooltip] = useState(false)
   
   const idToken = localStorage.getItem('idToken')
+  
+  // Keyboard shortcuts for tools
+  useToolShortcuts({ onToolSelect: selectTool })
 
   useEffect(() => {
     if (!isAuthenticated || !canvasId) {
@@ -217,13 +233,13 @@ const CanvasPage: React.FC = () => {
 
   const handleStageClick = (e: any) => {
     // Clear selection if clicking on empty space
-    if (selectedTool === 'select' && e.target === e.target.getStage()) {
+    if (selectedTool.id === 'select' && e.target === e.target.getStage()) {
       setSelectedObjectId(null)
       setEditingObjectId(null)
       return
     }
     
-    if (selectedTool === 'select') return
+    if (selectedTool.id === 'select') return
     
     // Prevent creating new objects while already drawing
     if (isDrawing) return
@@ -231,7 +247,13 @@ const CanvasPage: React.FC = () => {
     const stage = e.target.getStage()
     const point = stage.getPointerPosition()
 
-    if (selectedTool === 'rectangle') {
+    // Get tool properties with defaults
+    const toolProps = selectedTool.properties || {}
+    const strokeColor = toolProps.strokeColor || '#000000'
+    const fillColor = toolProps.fillColor || 'transparent'
+    const strokeWidth = toolProps.strokeWidth || 2
+
+    if (selectedTool.id === 'rectangle') {
       const rect = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -241,15 +263,15 @@ const CanvasPage: React.FC = () => {
           y: point.y,
           width: 100,
           height: 60,
-          fill: '#3b82f6',
-          stroke: '#1d4ed8',
-          strokeWidth: 2
+          fill: fillColor,
+          stroke: strokeColor,
+          strokeWidth: strokeWidth
         },
         created_by: user?.id || ''
       }
       setNewObject(rect)
       setIsDrawing(true)
-    } else if (selectedTool === 'circle') {
+    } else if (selectedTool.id === 'circle') {
       const circle = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -258,15 +280,15 @@ const CanvasPage: React.FC = () => {
           x: point.x,
           y: point.y,
           radius: 50,
-          fill: '#10b981',
-          stroke: '#059669',
-          strokeWidth: 2
+          fill: fillColor,
+          stroke: strokeColor,
+          strokeWidth: strokeWidth
         },
         created_by: user?.id || ''
       }
       setNewObject(circle)
       setIsDrawing(true)
-    } else if (selectedTool === 'text') {
+    } else if (selectedTool.id === 'text') {
       const text = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -275,15 +297,16 @@ const CanvasPage: React.FC = () => {
           x: point.x,
           y: point.y,
           text: 'Click to edit',
-          fontSize: 16,
-          fill: '#374151',
-          fontFamily: 'Arial'
+          fontSize: toolProps.fontSize || 16,
+          fontFamily: toolProps.fontFamily || 'Arial',
+          fill: strokeColor
         },
         created_by: user?.id || ''
       }
       setNewObject(text)
       setIsDrawing(true)
     }
+    // TODO: Add support for other tools (line, arrow, pen, etc.)
   }
 
   const handleStageMouseMove = (e: any) => {
@@ -612,64 +635,26 @@ const CanvasPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Toolbar */}
-      <div className="bg-white border-b px-4 py-2">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setSelectedTool('select')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Select
-          </button>
-          <button
-            onClick={() => setSelectedTool('rectangle')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'rectangle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Rectangle
-          </button>
-          <button
-            onClick={() => setSelectedTool('circle')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'circle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Circle
-          </button>
-          <button
-            onClick={() => setSelectedTool('text')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'text' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Text
-          </button>
-          {isDrawing && (
-            <>
-              <span className="ml-4 text-sm text-gray-600">
-                Drawing in progress... Click to place object
-              </span>
-              <button
-                onClick={() => {
-                  setNewObject(null)
-                  setIsDrawing(false)
-                  setSelectedTool('select')
-                }}
-                className="ml-2 px-3 py-1 rounded text-sm bg-red-100 text-red-700 hover:bg-red-200"
-              >
-                Cancel (ESC)
-              </button>
-            </>
-          )}
+      {/* Drawing Status Bar */}
+      {isDrawing && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              Drawing in progress... Click to place {selectedTool.name.toLowerCase()} object
+            </span>
+            <button
+              onClick={() => {
+                setNewObject(null)
+                setIsDrawing(false)
+                selectTool(getToolById('select')!)
+              }}
+              className="px-3 py-1 rounded text-sm bg-red-100 text-red-700 hover:bg-red-200 transition-colors duration-200"
+            >
+              Cancel (ESC)
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Canvas */}
       <div className="flex-1 overflow-hidden">
@@ -720,6 +705,20 @@ const CanvasPage: React.FC = () => {
           onClose={handleCursorLeave}
         />
       )}
+
+      {/* Floating Drawing Toolbar */}
+      <FloatingToolbar
+        position={preferences.position}
+        isVisible={isToolbarVisible}
+        selectedTool={selectedTool}
+        onToolSelect={selectTool}
+        onPositionChange={updatePosition}
+        onVisibilityToggle={toggleToolbarVisibility}
+        onCollapseToggle={toggleCollapse}
+        tools={getFilteredTools()}
+        preferences={preferences}
+        onPreferencesChange={updatePreferences}
+      />
     </div>
   )
 }
