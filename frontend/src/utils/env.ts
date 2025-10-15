@@ -10,6 +10,13 @@ export const validateEnvironment = () => {
   console.log('- NODE_ENV:', import.meta.env.NODE_ENV);
   console.log('- MODE:', import.meta.env.MODE);
   
+  // Temporary hardcoded fallback for production
+  if (import.meta.env.MODE === 'production') {
+    const hardcodedUrl = 'https://gauntlet-collab-canvas-24hr-production.up.railway.app';
+    console.log('Production mode detected, using hardcoded URL:', hardcodedUrl);
+    return hardcodedUrl;
+  }
+  
   if (!apiUrl) {
     console.warn('VITE_API_URL is not set! Using localhost fallback.');
     return 'http://localhost:5000';
