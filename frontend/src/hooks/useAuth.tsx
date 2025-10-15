@@ -38,11 +38,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Handle redirect result on app initialization (only if user came from redirect)
   useEffect(() => {
     const handleRedirectResult = async () => {
+      console.log('=== App initialization - checking auth state ===')
+      console.log('Current Firebase user:', auth.currentUser ? 'Present' : 'Null')
+      console.log('Local storage token:', localStorage.getItem('idToken') ? 'Present' : 'Missing')
+      
       // Only check for redirect result if we're in a redirect flow
       const urlParams = new URLSearchParams(window.location.search)
       const isRedirectFlow = urlParams.has('code') || urlParams.has('state') || 
                            window.location.pathname.includes('auth') ||
                            document.referrer.includes('accounts.google.com')
+      
+      console.log('Redirect flow detected:', isRedirectFlow)
+      console.log('URL params:', Object.fromEntries(urlParams.entries()))
+      console.log('Current path:', window.location.pathname)
+      console.log('Document referrer:', document.referrer)
       
       if (!isRedirectFlow) {
         console.log('Not a redirect flow - skipping redirect result check')
@@ -55,6 +64,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('idToken', refreshedToken)
             console.log('Token refreshed, user should remain authenticated')
           }
+        } else {
+          console.log('No existing authentication found')
         }
         
         setIsLoading(false)

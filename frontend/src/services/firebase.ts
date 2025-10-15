@@ -23,14 +23,37 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
 
+// Debug Firebase configuration
+console.log('Firebase configuration check:', {
+  hasApiKey: !!firebaseConfig.apiKey,
+  hasAuthDomain: !!firebaseConfig.authDomain,
+  hasProjectId: !!firebaseConfig.projectId,
+  hasStorageBucket: !!firebaseConfig.storageBucket,
+  hasMessagingSenderId: !!firebaseConfig.messagingSenderId,
+  hasAppId: !!firebaseConfig.appId,
+  hasMeasurementId: !!firebaseConfig.measurementId,
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId
+})
+
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 
+console.log('Firebase app initialized:', {
+  appName: app.name,
+  authDomain: firebaseConfig.authDomain,
+  projectId: firebaseConfig.projectId
+})
+
 // Configure Firebase auth persistence
-setPersistence(auth, browserLocalPersistence).catch((error) => {
+setPersistence(auth, browserLocalPersistence).then(() => {
+  console.log('Firebase auth persistence set to browserLocalPersistence')
+}).catch((error) => {
   console.error('Failed to set auth persistence:', error)
   // Fallback to session persistence if local fails
-  setPersistence(auth, browserSessionPersistence).catch((fallbackError) => {
+  setPersistence(auth, browserSessionPersistence).then(() => {
+    console.log('Firebase auth persistence set to browserSessionPersistence (fallback)')
+  }).catch((fallbackError) => {
     console.error('Failed to set session persistence:', fallbackError)
   })
 })
