@@ -28,6 +28,11 @@ const googleProvider = new GoogleAuthProvider()
 googleProvider.addScope('email')
 googleProvider.addScope('profile')
 
+// Configure provider for better compatibility
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+})
+
 // Custom error types for better error handling
 export class AuthenticationError extends Error {
   constructor(
@@ -69,19 +74,47 @@ const getAuthErrorMessage = (error: AuthError): string => {
       return 'Sign-in method is not enabled. Please contact support.'
     case 'auth/requires-recent-login':
       return 'Please sign in again to complete this action.'
+    case 'auth/web-storage-unsupported':
+      return 'Your browser does not support the required authentication features. Please try a different browser.'
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later.'
     default:
-      return 'An unexpected error occurred during sign-in. Please try again.'
+      return 'An unexpected error occurred during sign-in. This may be due to browser compatibility issues. Please try using a different browser or contact support.'
   }
 }
 
 export const signInWithGooglePopup = async (): Promise<User> => {
   try {
     console.log('Attempting Google sign-in with popup...')
+    
+    // Check for FedCM compatibility issues
+    if (typeof window !== 'undefined' && 'navigator' in window) {
+      const isFedCMSupported = 'credentials' in navigator && 'get' in navigator.credentials
+      console.log('FedCM support detected:', isFedCMSupported)
+      
+      if (!isFedCMSupported) {
+        console.warn('FedCM not supported - authentication may fail')
+      }
+    }
+    
     const result = await signInWithPopup(auth, googleProvider)
     console.log('Google sign-in successful via popup')
     return result.user
   } catch (error) {
     console.error('Popup sign-in failed:', error)
+    
+    // Check for specific FedCM-related errors
+    if (error instanceof Error) {
+      const errorMessage = error.message.toLowerCase()
+      if (errorMessage.includes('fedcm') || errorMessage.includes('credential') || errorMessage.includes('one tap')) {
+        console.error('FedCM-related authentication error detected')
+        throw new AuthenticationError(
+          'Authentication failed due to browser compatibility issues. Please try using the redirect method or a different browser.',
+          'fedcm-error',
+          error as AuthError
+        )
+      }
+    }
     
     if (error instanceof Error && 'code' in error) {
       const authError = error as AuthError
@@ -163,17 +196,24 @@ export const getGoogleRedirectResult = async (): Promise<User | null> => {
   }
 }
 
-// Fallback authentication that tries popup first, then redirect
+// Modern authentication that handles FedCM deprecation
 export const signInWithGoogle = async (): Promise<User> => {
+  console.log('Starting Google authentication with modern approach...')
+  
   try {
-    // First try popup method
+    // First try popup method with modern configuration
+    console.log('Attempting popup authentication...')
     return await signInWithGooglePopup()
   } catch (error) {
-    console.log('Popup sign-in failed, trying redirect method...', error)
+    console.log('Popup sign-in failed:', error)
     
-    // If popup fails due to blocking or user cancellation, try redirect
+    // If popup fails due to FedCM issues or blocking, try redirect
     if (error instanceof AuthenticationError) {
-      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+      if (error.code === 'auth/popup-blocked' || 
+          error.code === 'auth/popup-closed-by-user' ||
+          error.code === 'auth/operation-not-allowed') {
+        
+        console.log('Popup failed, attempting redirect authentication...')
         try {
           await signInWithGoogleRedirect()
           // This will redirect, so we won't reach here
@@ -182,8 +222,13 @@ export const signInWithGoogle = async (): Promise<User> => {
             'redirect-in-progress'
           )
         } catch (redirectError) {
-          // If redirect also fails, throw the original popup error
-          throw error
+          console.error('Redirect also failed:', redirectError)
+          // If redirect also fails, throw a more helpful error
+          throw new AuthenticationError(
+            'Both popup and redirect authentication failed. Please try again or check your browser settings.',
+            'auth-failed',
+            redirectError as AuthError
+          )
         }
       }
     }
