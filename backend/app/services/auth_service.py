@@ -22,7 +22,13 @@ class AuthService:
                 print("Firebase environment variables check:")
                 print(f"FIREBASE_PROJECT_ID: {'SET' if os.environ.get('FIREBASE_PROJECT_ID') else 'NOT SET'}")
                 print(f"FIREBASE_CLIENT_EMAIL: {'SET' if os.environ.get('FIREBASE_CLIENT_EMAIL') else 'NOT SET'}")
-                print(f"FIREBASE_PRIVATE_KEY: {'SET' if os.environ.get('FIREBASE_PRIVATE_KEY') else 'NOT SET'}")
+                private_key_raw = os.environ.get('FIREBASE_PRIVATE_KEY', '')
+                print(f"FIREBASE_PRIVATE_KEY: {'SET' if private_key_raw else 'NOT SET'}")
+                if private_key_raw:
+                    print(f"Private key length: {len(private_key_raw)}")
+                    print(f"Private key starts with: {private_key_raw[:50]}...")
+                    print(f"Private key contains \\n: {'\\n' in private_key_raw}")
+                    print(f"Private key contains actual newlines: {'\n' in private_key_raw}")
                 
                 # Check if Firebase is already initialized
                 try:
@@ -30,11 +36,25 @@ class AuthService:
                     print("Firebase already initialized")
                 except ValueError:
                     # Initialize Firebase with service account
+                    # Fix private key formatting - replace escaped newlines with actual newlines
+                    private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '')
+                    if private_key:
+                        # Replace escaped newlines with actual newlines
+                        private_key = private_key.replace('\\n', '\n')
+                        # Ensure proper PEM format
+                        if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
+                            private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
+                        if not private_key.endswith('-----END PRIVATE KEY-----\n'):
+                            if private_key.endswith('-----END PRIVATE KEY-----'):
+                                private_key += '\n'
+                            else:
+                                private_key += '\n-----END PRIVATE KEY-----\n'
+                    
                     firebase_config = {
                         "type": "service_account",
                         "project_id": os.environ.get('FIREBASE_PROJECT_ID'),
                         "private_key_id": os.environ.get('FIREBASE_PRIVATE_KEY_ID'),
-                        "private_key": os.environ.get('FIREBASE_PRIVATE_KEY'),
+                        "private_key": private_key,
                         "client_email": os.environ.get('FIREBASE_CLIENT_EMAIL'),
                         "client_id": os.environ.get('FIREBASE_CLIENT_ID'),
                         "auth_uri": os.environ.get('FIREBASE_AUTH_URI'),
