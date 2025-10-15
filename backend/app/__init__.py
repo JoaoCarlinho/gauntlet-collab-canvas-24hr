@@ -22,6 +22,8 @@ def create_app(config_class=Config):
         "https://gauntlet-collab-canvas-24hr-h7jvqmw9s-j-skeetes-projects.vercel.app",
         "https://gauntlet-collab-canvas-24hr-6l0tp5fsf-j-skeetes-projects.vercel.app",
         "https://gauntlet-collab-canvas-24hr-72qpaeq3m-j-skeetes-projects.vercel.app",
+        "https://gauntlet-collab-canvas-24hr-git-impro-7d472f-j-skeetes-projects.vercel.app",
+        "https://gauntlet-collab-canvas-24hr-git-*.vercel.app",  # Wildcard for all branch previews
         "https://*.vercel.app"
     ]
     
