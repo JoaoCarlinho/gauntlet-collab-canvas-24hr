@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Rect, Circle, Text } from 'react-konva'
+import { Rect, Circle, Text, Group } from 'react-konva'
 import { ArrowLeft, Users, Settings, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
@@ -14,6 +14,12 @@ import UserStatus from './UserStatus'
 import CollaborationSidebar from './CollaborationSidebar'
 import NotificationCenter from './NotificationCenter'
 import ZoomableCanvas from './ZoomableCanvas'
+import EditableText from './EditableText'
+import ResizeHandles from './ResizeHandles'
+import SelectionIndicator from './SelectionIndicator'
+import CursorTooltip from './CursorTooltip'
+import { getUserColor, getUserInitials, getCursorIcon } from '../utils/cursorUtils'
+import { FloatingToolbar, useToolbarState, useToolShortcuts, getToolById } from './toolbar'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -25,13 +31,38 @@ const CanvasPage: React.FC = () => {
   const [objects, setObjects] = useState<CanvasObject[]>([])
   const [cursors, setCursors] = useState<CursorData[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedTool, setSelectedTool] = useState<'select' | 'rectangle' | 'circle' | 'text'>('select')
   const [isDrawing, setIsDrawing] = useState(false)
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
   
+  // Floating toolbar state
+  const {
+    preferences,
+    selectedTool,
+    isVisible: isToolbarVisible,
+    updatePreferences,
+    selectTool,
+    toggleVisibility: toggleToolbarVisibility,
+    updatePosition,
+    toggleCollapse,
+    getFilteredTools
+  } = useToolbarState()
+  
+  // New state for enhanced object interactions
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
+  const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
+  const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
+  
+  // Cursor tooltip state
+  const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [showTooltip, setShowTooltip] = useState(false)
+  
   const idToken = localStorage.getItem('idToken')
+  
+  // Keyboard shortcuts for tools
+  useToolShortcuts({ onToolSelect: selectTool })
 
   useEffect(() => {
     if (!isAuthenticated || !canvasId) {
@@ -61,19 +92,25 @@ const CanvasPage: React.FC = () => {
     }
   }, [isAuthenticated, canvasId, isConnected])
 
-  // Handle escape key to cancel drawing
+  // Handle escape key to cancel drawing or editing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isDrawing) {
-        setNewObject(null)
-        setIsDrawing(false)
-        setSelectedTool('select')
+      if (e.key === 'Escape') {
+        if (isDrawing) {
+          setNewObject(null)
+          setIsDrawing(false)
+          selectTool(getToolById('select')!)
+        } else if (editingObjectId) {
+          setEditingObjectId(null)
+        } else if (selectedObjectId) {
+          setSelectedObjectId(null)
+        }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isDrawing])
+  }, [isDrawing, editingObjectId, selectedObjectId])
 
   const loadCanvas = async () => {
     try {
@@ -142,8 +179,67 @@ const CanvasPage: React.FC = () => {
     // Online users are now handled by PresenceIndicators component
   }
 
+  // New handler functions for enhanced interactions
+  const handleObjectSelect = (objectId: string) => {
+    if (selectedTool.id === 'select') {
+      setSelectedObjectId(objectId)
+      setEditingObjectId(null)
+    }
+  }
+
+  const handleStartTextEdit = (objectId: string) => {
+    setEditingObjectId(objectId)
+    setSelectedObjectId(objectId)
+  }
+
+  const handleEndTextEdit = async (objectId: string, newText: string) => {
+    if (idToken && newText !== objects.find(obj => obj.id === objectId)?.properties.text) {
+      await socketService.updateObject(canvasId!, idToken, objectId, {
+        text: newText
+      })
+    }
+    setEditingObjectId(null)
+  }
+
+  const handleObjectResize = async (objectId: string, newProperties: any) => {
+    if (idToken) {
+      await socketService.updateObject(canvasId!, idToken, objectId, newProperties)
+    }
+  }
+
+  const handleObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
+    if (idToken) {
+      await socketService.updateObject(canvasId!, idToken, objectId, { x, y })
+    }
+  }
+
+  // Cursor tooltip handlers
+  const handleCursorHover = (cursor: CursorData, event: any) => {
+    const stage = event.target.getStage()
+    const pointerPosition = stage.getPointerPosition()
+    
+    setHoveredCursor(cursor)
+    setTooltipPosition({
+      x: pointerPosition.x,
+      y: pointerPosition.y
+    })
+    setShowTooltip(true)
+  }
+
+  const handleCursorLeave = () => {
+    setShowTooltip(false)
+    setHoveredCursor(null)
+  }
+
   const handleStageClick = (e: any) => {
-    if (selectedTool === 'select') return
+    // Clear selection if clicking on empty space
+    if (selectedTool.id === 'select' && e.target === e.target.getStage()) {
+      setSelectedObjectId(null)
+      setEditingObjectId(null)
+      return
+    }
+    
+    if (selectedTool.id === 'select') return
     
     // Prevent creating new objects while already drawing
     if (isDrawing) return
@@ -151,7 +247,13 @@ const CanvasPage: React.FC = () => {
     const stage = e.target.getStage()
     const point = stage.getPointerPosition()
 
-    if (selectedTool === 'rectangle') {
+    // Get tool properties with defaults
+    const toolProps = selectedTool.properties || {}
+    const strokeColor = toolProps.strokeColor || '#000000'
+    const fillColor = toolProps.fillColor || 'transparent'
+    const strokeWidth = toolProps.strokeWidth || 2
+
+    if (selectedTool.id === 'rectangle') {
       const rect = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -161,15 +263,15 @@ const CanvasPage: React.FC = () => {
           y: point.y,
           width: 100,
           height: 60,
-          fill: '#3b82f6',
-          stroke: '#1d4ed8',
-          strokeWidth: 2
+          fill: fillColor,
+          stroke: strokeColor,
+          strokeWidth: strokeWidth
         },
         created_by: user?.id || ''
       }
       setNewObject(rect)
       setIsDrawing(true)
-    } else if (selectedTool === 'circle') {
+    } else if (selectedTool.id === 'circle') {
       const circle = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -178,15 +280,15 @@ const CanvasPage: React.FC = () => {
           x: point.x,
           y: point.y,
           radius: 50,
-          fill: '#10b981',
-          stroke: '#059669',
-          strokeWidth: 2
+          fill: fillColor,
+          stroke: strokeColor,
+          strokeWidth: strokeWidth
         },
         created_by: user?.id || ''
       }
       setNewObject(circle)
       setIsDrawing(true)
-    } else if (selectedTool === 'text') {
+    } else if (selectedTool.id === 'text') {
       const text = {
         id: `temp-${Date.now()}`,
         canvas_id: canvasId!,
@@ -195,15 +297,16 @@ const CanvasPage: React.FC = () => {
           x: point.x,
           y: point.y,
           text: 'Click to edit',
-          fontSize: 16,
-          fill: '#374151',
-          fontFamily: 'Arial'
+          fontSize: toolProps.fontSize || 16,
+          fontFamily: toolProps.fontFamily || 'Arial',
+          fill: strokeColor
         },
         created_by: user?.id || ''
       }
       setNewObject(text)
       setIsDrawing(true)
     }
+    // TODO: Add support for other tools (line, arrow, pen, etc.)
   }
 
   const handleStageMouseMove = (e: any) => {
@@ -255,73 +358,80 @@ const CanvasPage: React.FC = () => {
 
   const renderObject = (obj: CanvasObject) => {
     const props = obj.properties
+    const isSelected = selectedObjectId === obj.id
+    const isEditing = editingObjectId === obj.id
+    const isHovered = hoveredObjectId === obj.id
 
     switch (obj.object_type) {
       case 'rectangle':
         return (
-          <Rect
-            key={obj.id}
-            x={props.x}
-            y={props.y}
-            width={props.width}
-            height={props.height}
-            fill={props.fill}
-            stroke={props.stroke}
-            strokeWidth={props.strokeWidth}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
-          />
+          <Group key={obj.id}>
+            <Rect
+              x={props.x}
+              y={props.y}
+              width={props.width}
+              height={props.height}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize} 
+            />
+          </Group>
         )
       case 'circle':
         return (
-          <Circle
-            key={obj.id}
-            x={props.x}
-            y={props.y}
-            radius={props.radius}
-            fill={props.fill}
-            stroke={props.stroke}
-            strokeWidth={props.strokeWidth}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
-          />
+          <Group key={obj.id}>
+            <Circle
+              x={props.x}
+              y={props.y}
+              radius={props.radius}
+              fill={props.fill}
+              stroke={props.stroke}
+              strokeWidth={props.strokeWidth}
+              draggable={selectedTool.id === 'select' && !isEditing}
+              onClick={() => handleObjectSelect(obj.id)}
+              onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
+              onMouseEnter={() => setHoveredObjectId(obj.id)}
+              onMouseLeave={() => setHoveredObjectId(null)}
+            />
+            <SelectionIndicator 
+              object={obj} 
+              isSelected={isSelected} 
+              isHovered={isHovered && !isSelected} 
+            />
+            <ResizeHandles 
+              object={obj} 
+              isSelected={isSelected} 
+              onResize={handleObjectResize} 
+            />
+          </Group>
         )
       case 'text':
         return (
-          <Text
+          <EditableText
             key={obj.id}
-            x={props.x}
-            y={props.y}
-            text={props.text}
-            fontSize={props.fontSize}
-            fill={props.fill}
-            fontFamily={props.fontFamily}
-            draggable={selectedTool === 'select'}
-            onDragEnd={(e) => {
-              if (idToken) {
-                socketService.updateObject(canvasId!, idToken, obj.id, {
-                  ...props,
-                  x: e.target.x(),
-                  y: e.target.y()
-                })
-              }
-            }}
+            object={obj}
+            isSelected={isSelected}
+            isEditing={isEditing}
+            onStartEdit={handleStartTextEdit}
+            onEndEdit={handleEndTextEdit}
+            onSelect={handleObjectSelect}
+            onUpdatePosition={handleObjectUpdatePosition}
+            selectedTool={selectedTool.id}
           />
         )
       default:
@@ -378,17 +488,53 @@ const CanvasPage: React.FC = () => {
   }
 
   const renderCursors = () => {
-    return cursors.map((cursor) => (
-      <Text
-        key={cursor.user_id}
-        x={cursor.position.x}
-        y={cursor.position.y - 20}
-        text={`👆 ${cursor.user_name}`}
-        fontSize={12}
-        fill="#3b82f6"
-        fontFamily="Arial"
-      />
-    ))
+    return cursors.map((cursor) => {
+      const userColor = getUserColor(cursor.user_id)
+      const userInitials = getUserInitials(cursor.user_name)
+      const cursorIcon = getCursorIcon(cursor.user_id)
+      
+      return (
+        <Group
+          key={cursor.user_id}
+          x={cursor.position.x}
+          y={cursor.position.y}
+          onMouseEnter={(e) => handleCursorHover(cursor, e)}
+          onMouseLeave={handleCursorLeave}
+        >
+          {/* Cursor pointer icon */}
+          <Text
+            x={-8}
+            y={-8}
+            text={cursorIcon}
+            fontSize={16}
+            fill={userColor}
+            fontFamily="Arial"
+          />
+          
+          {/* User avatar circle */}
+          <Circle
+            x={0}
+            y={0}
+            radius={12}
+            fill={userColor}
+            stroke="#fff"
+            strokeWidth={2}
+            opacity={0.9}
+          />
+          
+          {/* User initials */}
+          <Text
+            x={-4}
+            y={-4}
+            text={userInitials}
+            fontSize={8}
+            fill="#fff"
+            fontFamily="Arial"
+            fontStyle="bold"
+          />
+        </Group>
+      )
+    })
   }
 
   if (isLoading) {
@@ -489,64 +635,26 @@ const CanvasPage: React.FC = () => {
         </div>
       </header>
 
-      {/* Toolbar */}
-      <div className="bg-white border-b px-4 py-2">
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setSelectedTool('select')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Select
-          </button>
-          <button
-            onClick={() => setSelectedTool('rectangle')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'rectangle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Rectangle
-          </button>
-          <button
-            onClick={() => setSelectedTool('circle')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'circle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Circle
-          </button>
-          <button
-            onClick={() => setSelectedTool('text')}
-            disabled={isDrawing}
-            className={`px-3 py-1 rounded text-sm ${
-              selectedTool === 'text' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            Text
-          </button>
-          {isDrawing && (
-            <>
-              <span className="ml-4 text-sm text-gray-600">
-                Drawing in progress... Click to place object
-              </span>
-              <button
-                onClick={() => {
-                  setNewObject(null)
-                  setIsDrawing(false)
-                  setSelectedTool('select')
-                }}
-                className="ml-2 px-3 py-1 rounded text-sm bg-red-100 text-red-700 hover:bg-red-200"
-              >
-                Cancel (ESC)
-              </button>
-            </>
-          )}
+      {/* Drawing Status Bar */}
+      {isDrawing && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-700">
+              Drawing in progress... Click to place {selectedTool.name.toLowerCase()} object
+            </span>
+            <button
+              onClick={() => {
+                setNewObject(null)
+                setIsDrawing(false)
+                selectTool(getToolById('select')!)
+              }}
+              className="px-3 py-1 rounded text-sm bg-red-100 text-red-700 hover:bg-red-200 transition-colors duration-200"
+            >
+              Cancel (ESC)
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Canvas */}
       <div className="flex-1 overflow-hidden">
@@ -587,6 +695,30 @@ const CanvasPage: React.FC = () => {
           canvasTitle={canvas.title}
         />
       )}
+
+      {/* Cursor Tooltip */}
+      {hoveredCursor && (
+        <CursorTooltip
+          cursor={hoveredCursor}
+          position={tooltipPosition}
+          isVisible={showTooltip}
+          onClose={handleCursorLeave}
+        />
+      )}
+
+      {/* Floating Drawing Toolbar */}
+      <FloatingToolbar
+        position={preferences.position}
+        isVisible={isToolbarVisible}
+        selectedTool={selectedTool}
+        onToolSelect={selectTool}
+        onPositionChange={updatePosition}
+        onVisibilityToggle={toggleToolbarVisibility}
+        onCollapseToggle={toggleCollapse}
+        tools={getFilteredTools()}
+        preferences={preferences}
+        onPreferencesChange={updatePreferences}
+      />
     </div>
   )
 }

@@ -1,13 +1,35 @@
 from flask_socketio import emit, join_room, leave_room
 from app.services.auth_service import AuthService
 from app.extensions import redis_client
+from app.utils.logger import SmartLogger
 import json
 
 def register_cursor_handlers(socketio):
     """Register cursor-related Socket.IO event handlers."""
     
+    # Initialize logger
+    cursor_logger = SmartLogger('cursor_events', 'INFO')
+    
+    def authenticate_socket_user_quiet(id_token):
+        """Authenticate user with minimal logging."""
+        try:
+            auth_service = AuthService()
+            decoded_token = auth_service.verify_token(id_token)
+            user = auth_service.get_user_by_id(decoded_token['uid'])
+            
+            if not user:
+                user = auth_service.register_user(id_token)
+                cursor_logger.log_auth(user.id, "registered")
+            else:
+                cursor_logger.log_auth(user.id, "authenticated")
+            
+            return user
+        except Exception as e:
+            cursor_logger.log_error(f"Authentication failed", e)
+            raise e
+    
     def authenticate_socket_user(id_token):
-        """Authenticate user for Socket.IO events."""
+        """Authenticate user for Socket.IO events (verbose for debugging)."""
         try:
             print(f"=== Socket.IO Cursor Authentication Debug ===")
             print(f"Token length: {len(id_token) if id_token else 0}")
@@ -32,7 +54,7 @@ def register_cursor_handlers(socketio):
     
     @socketio.on('cursor_move')
     def handle_cursor_move(data):
-        """Handle cursor movement."""
+        """Handle cursor movement with reduced logging."""
         try:
             canvas_id = data.get('canvas_id')
             id_token = data.get('id_token')
@@ -41,14 +63,17 @@ def register_cursor_handlers(socketio):
             if not all([canvas_id, id_token, position]):
                 return
             
-            # Verify authentication
+            # Verify authentication (with reduced logging)
             try:
-                user = authenticate_socket_user(id_token)
+                user = authenticate_socket_user_quiet(id_token)
             except Exception as e:
-                print(f"Cursor authentication failed: {str(e)}")
+                cursor_logger.log_error(f"Cursor authentication failed", e)
                 return
             
-            # Store cursor position in Redis for caching
+            # Log cursor movement (rate limited)
+            cursor_logger.log_cursor_move(user.id, position)
+            
+            # Store cursor position in Redis
             if redis_client:
                 cursor_data = {
                     'user_id': user.id,
@@ -62,7 +87,7 @@ def register_cursor_handlers(socketio):
                     json.dumps(cursor_data)
                 )
             
-            # Broadcast cursor position to other users in the room
+            # Broadcast cursor position
             emit('cursor_moved', {
                 'user_id': user.id,
                 'user_name': user.name,
@@ -71,6 +96,7 @@ def register_cursor_handlers(socketio):
             }, room=canvas_id, include_self=False)
             
         except Exception as e:
+            cursor_logger.log_error(f"Cursor move handler error", e)
             emit('error', {'message': str(e)})
     
     @socketio.on('cursor_leave')
@@ -83,12 +109,11 @@ def register_cursor_handlers(socketio):
             if not all([canvas_id, id_token]):
                 return
             
-            # Verify authentication
-            auth_service = AuthService()
+            # Verify authentication (with reduced logging)
             try:
-                decoded_token = auth_service.verify_token(id_token)
-                user = auth_service.get_user_by_id(decoded_token['uid'])
-            except Exception:
+                user = authenticate_socket_user_quiet(id_token)
+            except Exception as e:
+                cursor_logger.log_error(f"Cursor leave authentication failed", e)
                 return
             
             # Remove cursor from Redis
@@ -102,6 +127,7 @@ def register_cursor_handlers(socketio):
             }, room=canvas_id, include_self=False)
             
         except Exception as e:
+            cursor_logger.log_error(f"Cursor leave handler error", e)
             emit('error', {'message': str(e)})
     
     @socketio.on('get_cursors')
@@ -114,12 +140,11 @@ def register_cursor_handlers(socketio):
             if not all([canvas_id, id_token]):
                 return
             
-            # Verify authentication
-            auth_service = AuthService()
+            # Verify authentication (with reduced logging)
             try:
-                decoded_token = auth_service.verify_token(id_token)
-                user = auth_service.get_user_by_id(decoded_token['uid'])
-            except Exception:
+                user = authenticate_socket_user_quiet(id_token)
+            except Exception as e:
+                cursor_logger.log_error(f"Get cursors authentication failed", e)
                 return
             
             # Get all active cursors from Redis
@@ -141,4 +166,5 @@ def register_cursor_handlers(socketio):
             })
             
         except Exception as e:
+            cursor_logger.log_error(f"Get cursors handler error", e)
             emit('error', {'message': str(e)})

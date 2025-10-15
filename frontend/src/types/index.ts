@@ -88,3 +88,6 @@ export interface AuthState {
   isLoading: boolean
   isAuthenticated: boolean
 }
+
+// Re-export toolbar types
+export * from './toolbar'

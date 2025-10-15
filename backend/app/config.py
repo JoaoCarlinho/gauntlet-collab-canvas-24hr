@@ -1,4 +1,5 @@
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,17 +23,40 @@ class Config:
     
     # CORS Configuration
     CORS_ORIGINS = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
+    
+    # Socket.IO Logging Configuration
+    SOCKETIO_LOGGER = os.environ.get('SOCKETIO_LOGGER', 'false').lower() == 'true'
+    SOCKETIO_ENGINEIO_LOGGER = os.environ.get('SOCKETIO_ENGINEIO_LOGGER', 'false').lower() == 'true'
+    
+    # Logging Levels
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
+    CURSOR_LOG_LEVEL = os.environ.get('CURSOR_LOG_LEVEL', 'WARNING')  # Reduce cursor spam
 
 class DevelopmentConfig(Config):
     DEBUG = True
     FLASK_ENV = 'development'
+    # Verbose logging for development
+    SOCKETIO_LOGGER = True
+    SOCKETIO_ENGINEIO_LOGGER = True
+    LOG_LEVEL = 'DEBUG'
+    CURSOR_LOG_LEVEL = 'INFO'
 
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     SOCKETIO_MESSAGE_QUEUE = None
     FLASK_ENV = 'testing'
+    # Minimal logging for testing
+    SOCKETIO_LOGGER = False
+    SOCKETIO_ENGINEIO_LOGGER = False
+    LOG_LEVEL = 'WARNING'
+    CURSOR_LOG_LEVEL = 'ERROR'
 
 class ProductionConfig(Config):
     DEBUG = False
     FLASK_ENV = 'production'
+    # Minimal logging for production
+    SOCKETIO_LOGGER = False
+    SOCKETIO_ENGINEIO_LOGGER = False
+    LOG_LEVEL = 'WARNING'
+    CURSOR_LOG_LEVEL = 'ERROR'  # Only log cursor errors in production

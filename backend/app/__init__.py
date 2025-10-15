@@ -27,18 +27,26 @@ def create_app(config_class=Config):
         "https://*.vercel.app"
     ]
     
+    # Initialize CORS with comprehensive configuration
+    cors.init_app(
+        app, 
+        origins=allowed_origins, 
+        supports_credentials=True,
+        allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    )
+    
     socketio.init_app(
         app, 
         cors_allowed_origins=allowed_origins, 
         manage_session=False,
-        logger=True,
-        engineio_logger=True,
+        logger=app.config.get('SOCKETIO_LOGGER', False),  # Environment controlled
+        engineio_logger=app.config.get('SOCKETIO_ENGINEIO_LOGGER', False),  # Environment controlled
         ping_timeout=60,
         ping_interval=25,
         max_http_buffer_size=1000000,
         always_connect=True
     )
-    cors.init_app(app, origins=allowed_origins, supports_credentials=True)
     migrate.init_app(app, db)
     
     # Initialize Swagger
@@ -107,21 +115,26 @@ def create_app(config_class=Config):
     @socketio.on('connect')
     def handle_connect(auth=None):
         """Handle Socket.IO connection."""
-        print("=== Socket.IO Connection Established ===")
-        print(f"Auth data: {auth}")
+        # Only log in development mode
+        if app.config.get('DEBUG', False):
+            print("=== Socket.IO Connection Established ===")
+            print(f"Auth data: {auth}")
         
         # Ensure Firebase is initialized
         try:
             from app.services.auth_service import AuthService
             auth_service = AuthService()
-            print("Firebase Admin SDK is properly initialized for Socket.IO")
+            if app.config.get('DEBUG', False):
+                print("Firebase Admin SDK is properly initialized for Socket.IO")
         except Exception as e:
             print(f"Firebase initialization check failed: {e}")
     
     @socketio.on('disconnect')
     def handle_disconnect():
         """Handle Socket.IO disconnection."""
-        print("=== Socket.IO Connection Disconnected ===")
+        # Only log in development mode
+        if app.config.get('DEBUG', False):
+            print("=== Socket.IO Connection Disconnected ===")
     
     # Create database tables
     with app.app_context():
