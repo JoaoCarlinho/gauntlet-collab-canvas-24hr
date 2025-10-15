@@ -7,6 +7,7 @@ canvas_bp = Blueprint('canvas', __name__)
 canvas_service = CanvasService()
 
 @canvas_bp.route('/', methods=['GET'])
+@canvas_bp.route('', methods=['GET'])
 @require_auth
 @swag_from({
     'tags': ['Canvas'],
@@ -61,6 +62,7 @@ def get_canvases(current_user):
         return jsonify({'error': str(e)}), 500
 
 @canvas_bp.route('/', methods=['POST'])
+@canvas_bp.route('', methods=['POST'])
 @require_auth
 @swag_from({
     'tags': ['Canvas'],
