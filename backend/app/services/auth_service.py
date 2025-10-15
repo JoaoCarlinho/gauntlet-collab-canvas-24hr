@@ -160,6 +160,8 @@ class AuthService:
             print("User committed to database successfully")
         except Exception as e:
             print(f"Database commit failed: {str(e)}")
+            print(f"Exception type: {type(e)}")
+            print(f"Exception details: {e}")
             db.session.rollback()
             raise e
         

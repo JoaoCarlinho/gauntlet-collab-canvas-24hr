@@ -76,6 +76,12 @@ def register():
         }), 201
         
     except Exception as e:
+        print(f"=== Registration Route Error ===")
+        print(f"Exception type: {type(e)}")
+        print(f"Exception message: {str(e)}")
+        print(f"Exception details: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 400
 
 @auth_bp.route('/me', methods=['GET'])
