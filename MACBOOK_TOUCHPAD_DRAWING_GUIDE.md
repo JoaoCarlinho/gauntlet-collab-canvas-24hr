@@ -107,11 +107,20 @@ This guide will help you create beautiful drawings and designs using only your M
 - **Delete** - Delete selected object
 
 ### **Canvas Navigation**
-- **Space + drag** - Pan around canvas
+- **Space + drag** - Pan around canvas (recommended)
+- **Two-finger drag** - Alternative panning method
 - **Cmd + Plus** - Zoom in
 - **Cmd + Minus** - Zoom out
+- **Pinch gestures** - Smooth zoom in/out
 - **Cmd + 0** - Fit to screen
 - **Cmd + 1** - Actual size
+
+### **Panning Techniques**
+- **Hold Space bar** with thumb, then drag with one finger for precise panning
+- **Use two-finger drag** for general canvas movement
+- **Combine with zoom** for efficient navigation
+- **Practice smooth movements** to avoid jerky panning
+- **Use diagonal panning** for efficient large canvas navigation
 
 ---
 

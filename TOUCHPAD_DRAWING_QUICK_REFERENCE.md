@@ -24,7 +24,21 @@
 | **Two-Finger Tap** | Right-click | Context menu, tool options |
 | **Pinch** | Zoom | Zoom in/out for detail work |
 | **Two-Finger Drag** | Pan | Move around canvas |
+| **Space + Drag** | Pan | Precise panning (recommended) |
 | **Drag** | Move/Draw | Create shapes, move objects |
+
+## 🗺️ **Canvas Navigation**
+
+| Action | Method | Best For |
+|--------|--------|----------|
+| **Pan** | Space + drag | Precise movement |
+| **Pan** | Two-finger drag | General movement |
+| **Zoom In** | Cmd + Plus | Step-by-step zoom |
+| **Zoom In** | Pinch out | Smooth zoom |
+| **Zoom Out** | Cmd + Minus | Step-by-step zoom |
+| **Zoom Out** | Pinch in | Smooth zoom |
+| **Fit to Screen** | Cmd + 0 | See entire canvas |
+| **Actual Size** | Cmd + 1 | 100% zoom |
 
 ## 🎯 **Drawing Tips**
 
