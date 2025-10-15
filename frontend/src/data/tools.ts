@@ -16,7 +16,7 @@ import {
   Star,
   Heart,
   Diamond,
-  Spray,
+  SprayCan,
   Copy,
   Zap
 } from 'lucide-react'
@@ -191,7 +191,7 @@ export const TOOLS: DrawingTool[] = [
   {
     id: 'spray',
     name: 'Spray Paint',
-    icon: Spray,
+    icon: SprayCan,
     category: ToolCategory.DRAWING,
     shortcut: 'y',
     cursor: 'crosshair',

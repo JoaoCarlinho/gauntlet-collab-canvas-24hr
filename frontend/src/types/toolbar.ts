@@ -1,4 +1,4 @@
-import { ReactComponent } from 'react'
+import React from 'react'
 
 export enum ToolCategory {
   SELECT = 'select',
@@ -12,7 +12,7 @@ export enum ToolCategory {
 export interface DrawingTool {
   id: string
   name: string
-  icon: ReactComponent
+  icon: React.ComponentType<any>
   category: ToolCategory
   shortcut?: string
   cursor?: string

@@ -1,14 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { 
   Move, 
-  Eye, 
   EyeOff, 
   ChevronLeft, 
   ChevronRight, 
-  Settings,
-  X
+  Settings
 } from 'lucide-react'
-import { FloatingToolbarProps, ToolbarPreferences } from '../../types/toolbar'
+import { FloatingToolbarProps, DrawingTool } from '../../types/toolbar'
 import { TOOL_CATEGORIES } from '../../data/tools'
 import ToolGroup from './ToolGroup'
 
@@ -68,7 +66,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
   }, [isCollapsed, onCollapseToggle, onPreferencesChange])
 
   // Handle tool selection
-  const handleToolSelect = useCallback((tool) => {
+  const handleToolSelect = useCallback((tool: DrawingTool) => {
     onToolSelect(tool)
   }, [onToolSelect])
 

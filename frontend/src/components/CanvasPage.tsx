@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
-import { Canvas, CanvasObject, CursorData, DrawingTool } from '../types'
+import { Canvas, CanvasObject, CursorData } from '../types'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -99,7 +99,7 @@ const CanvasPage: React.FC = () => {
         if (isDrawing) {
           setNewObject(null)
           setIsDrawing(false)
-          setSelectedTool('select')
+          selectTool(getToolById('select')!)
         } else if (editingObjectId) {
           setEditingObjectId(null)
         } else if (selectedObjectId) {
@@ -181,7 +181,7 @@ const CanvasPage: React.FC = () => {
 
   // New handler functions for enhanced interactions
   const handleObjectSelect = (objectId: string) => {
-    if (selectedTool === 'select') {
+    if (selectedTool.id === 'select') {
       setSelectedObjectId(objectId)
       setEditingObjectId(null)
     }
@@ -374,7 +374,7 @@ const CanvasPage: React.FC = () => {
               fill={props.fill}
               stroke={props.stroke}
               strokeWidth={props.strokeWidth}
-              draggable={selectedTool === 'select' && !isEditing}
+              draggable={selectedTool.id === 'select' && !isEditing}
               onClick={() => handleObjectSelect(obj.id)}
               onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
               onMouseEnter={() => setHoveredObjectId(obj.id)}
@@ -402,7 +402,7 @@ const CanvasPage: React.FC = () => {
               fill={props.fill}
               stroke={props.stroke}
               strokeWidth={props.strokeWidth}
-              draggable={selectedTool === 'select' && !isEditing}
+              draggable={selectedTool.id === 'select' && !isEditing}
               onClick={() => handleObjectSelect(obj.id)}
               onDragEnd={(e) => handleObjectUpdatePosition(obj.id, e.target.x(), e.target.y())}
               onMouseEnter={() => setHoveredObjectId(obj.id)}
@@ -431,7 +431,7 @@ const CanvasPage: React.FC = () => {
             onEndEdit={handleEndTextEdit}
             onSelect={handleObjectSelect}
             onUpdatePosition={handleObjectUpdatePosition}
-            selectedTool={selectedTool}
+            selectedTool={selectedTool.id}
           />
         )
       default:
