@@ -24,7 +24,7 @@ def register_presence_handlers(socketio):
             except Exception:
                 return
             
-            # Store user presence in Redis
+            # Store user presence in Redis (if available)
             if redis_client:
                 presence_data = {
                     'user_id': user.id,

@@ -71,12 +71,22 @@ class CanvasService:
     
     def check_canvas_permission(self, canvas_id, user_id, permission_type='view'):
         """Check if user has permission on canvas."""
+        print(f"=== Permission Check Debug ===")
+        print(f"Canvas ID: {canvas_id}")
+        print(f"User ID: {user_id}")
+        print(f"Permission type: {permission_type}")
+        
         canvas = self.get_canvas_by_id(canvas_id)
         if not canvas:
+            print("Canvas not found in permission check")
             return False
+        
+        print(f"Canvas owner ID: {canvas.owner_id}")
+        print(f"Canvas is public: {canvas.is_public}")
         
         # Owner has all permissions
         if canvas.owner_id == user_id:
+            print("User is owner - permission granted")
             return True
         
         # Check if canvas is public (view permission only)

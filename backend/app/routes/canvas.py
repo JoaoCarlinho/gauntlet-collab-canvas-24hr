@@ -139,6 +139,10 @@ def get_canvases(current_user):
 def create_canvas(current_user):
     """Create a new canvas."""
     try:
+        print(f"=== Canvas Creation Debug ===")
+        print(f"Current user ID: {current_user.id}")
+        print(f"Current user email: {current_user.email}")
+        
         data = request.get_json()
         title = data.get('title')
         description = data.get('description', '')
@@ -224,12 +228,25 @@ def create_canvas(current_user):
 def get_canvas(current_user, canvas_id):
     """Get a specific canvas."""
     try:
+        print(f"=== Canvas Access Debug ===")
+        print(f"Canvas ID: {canvas_id}")
+        print(f"Current user ID: {current_user.id}")
+        print(f"Current user email: {current_user.email}")
+        
         canvas = canvas_service.get_canvas_by_id(canvas_id)
         if not canvas:
+            print("Canvas not found")
             return jsonify({'error': 'Canvas not found'}), 404
         
+        print(f"Canvas found - Owner ID: {canvas.owner_id}")
+        print(f"Canvas is public: {canvas.is_public}")
+        
         # Check permission
-        if not canvas_service.check_canvas_permission(canvas_id, current_user.id):
+        has_permission = canvas_service.check_canvas_permission(canvas_id, current_user.id)
+        print(f"User has permission: {has_permission}")
+        
+        if not has_permission:
+            print("Access denied - user does not have permission")
             return jsonify({'error': 'Access denied'}), 403
         
         return jsonify({
