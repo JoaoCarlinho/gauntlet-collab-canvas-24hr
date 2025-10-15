@@ -226,3 +226,4 @@ describe('Canvas Interaction with Authentication', () => {
     cy.screenshot('28-final-state-after-auth')
   })
 })
+

@@ -92,3 +92,4 @@ describe('Debug Screenshot Functionality', () => {
     cy.screenshot('17-after-reload')
   })
 })
+

@@ -55,6 +55,20 @@ const CanvasPage: React.FC = () => {
     }
   }, [isAuthenticated, canvasId, isConnected])
 
+  // Handle escape key to cancel drawing
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isDrawing) {
+        setNewObject(null)
+        setIsDrawing(false)
+        setSelectedTool('select')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isDrawing])
+
   const loadCanvas = async () => {
     try {
       const response = await canvasAPI.getCanvas(canvasId!)
@@ -126,6 +140,9 @@ const CanvasPage: React.FC = () => {
 
   const handleStageClick = (e: any) => {
     if (selectedTool === 'select') return
+    
+    // Prevent creating new objects while already drawing
+    if (isDrawing) return
 
     const stage = e.target.getStage()
     const point = stage.getPointerPosition()
@@ -435,36 +452,57 @@ const CanvasPage: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setSelectedTool('select')}
+            disabled={isDrawing}
             className={`px-3 py-1 rounded text-sm ${
               selectedTool === 'select' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            }`}
+            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             Select
           </button>
           <button
             onClick={() => setSelectedTool('rectangle')}
+            disabled={isDrawing}
             className={`px-3 py-1 rounded text-sm ${
               selectedTool === 'rectangle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            }`}
+            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             Rectangle
           </button>
           <button
             onClick={() => setSelectedTool('circle')}
+            disabled={isDrawing}
             className={`px-3 py-1 rounded text-sm ${
               selectedTool === 'circle' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            }`}
+            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             Circle
           </button>
           <button
             onClick={() => setSelectedTool('text')}
+            disabled={isDrawing}
             className={`px-3 py-1 rounded text-sm ${
               selectedTool === 'text' ? 'bg-primary-100 text-primary-700' : 'hover:bg-gray-100'
-            }`}
+            } ${isDrawing ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             Text
           </button>
+          {isDrawing && (
+            <>
+              <span className="ml-4 text-sm text-gray-600">
+                Drawing in progress... Click to place object
+              </span>
+              <button
+                onClick={() => {
+                  setNewObject(null)
+                  setIsDrawing(false)
+                  setSelectedTool('select')
+                }}
+                className="ml-2 px-3 py-1 rounded text-sm bg-red-100 text-red-700 hover:bg-red-200"
+              >
+                Cancel (ESC)
+              </button>
+            </>
+          )}
         </div>
       </div>
 
