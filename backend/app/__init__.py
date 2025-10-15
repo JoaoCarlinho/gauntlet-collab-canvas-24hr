@@ -103,6 +103,26 @@ def create_app(config_class=Config):
     from .socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
     
+    # Add Socket.IO connection authentication
+    @socketio.on('connect')
+    def handle_connect(auth=None):
+        """Handle Socket.IO connection."""
+        print("=== Socket.IO Connection Established ===")
+        print(f"Auth data: {auth}")
+        
+        # Ensure Firebase is initialized
+        try:
+            from app.services.auth_service import AuthService
+            auth_service = AuthService()
+            print("Firebase Admin SDK is properly initialized for Socket.IO")
+        except Exception as e:
+            print(f"Firebase initialization check failed: {e}")
+    
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        """Handle Socket.IO disconnection."""
+        print("=== Socket.IO Connection Disconnected ===")
+    
     # Create database tables
     with app.app_context():
         try:

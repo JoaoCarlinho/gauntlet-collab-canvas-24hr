@@ -7,6 +7,31 @@ import json
 def register_canvas_handlers(socketio):
     """Register canvas-related Socket.IO event handlers."""
     
+    def authenticate_socket_user(id_token):
+        """Authenticate user for Socket.IO events."""
+        try:
+            print(f"=== Socket.IO Authentication Debug ===")
+            print(f"Token length: {len(id_token) if id_token else 0}")
+            print(f"Token starts with: {id_token[:50] if id_token else 'None'}...")
+            
+            auth_service = AuthService()
+            decoded_token = auth_service.verify_token(id_token)
+            print(f"Token verified for user: {decoded_token.get('uid', 'unknown')}")
+            
+            user = auth_service.get_user_by_id(decoded_token['uid'])
+            if not user:
+                print("User not found in database, registering...")
+                user = auth_service.register_user(id_token)
+                print(f"User registered: {user.email}")
+            else:
+                print(f"User found in database: {user.email}")
+            
+            return user
+        except Exception as e:
+            print(f"Socket.IO authentication failed: {str(e)}")
+            print(f"Exception type: {type(e)}")
+            raise e
+    
     @socketio.on('join_canvas')
     def handle_join_canvas(data):
         """Handle user joining a canvas room."""
@@ -14,17 +39,17 @@ def register_canvas_handlers(socketio):
             canvas_id = data.get('canvas_id')
             id_token = data.get('id_token')
             
+            print(f"=== Join Canvas Debug ===")
+            print(f"Canvas ID: {canvas_id}")
+            print(f"Token provided: {bool(id_token)}")
+            
             if not canvas_id or not id_token:
                 emit('error', {'message': 'canvas_id and id_token are required'})
                 return
             
             # Verify authentication
-            auth_service = AuthService()
             try:
-                decoded_token = auth_service.verify_token(id_token)
-                user = auth_service.get_user_by_id(decoded_token['uid'])
-                if not user:
-                    user = auth_service.register_user(id_token)
+                user = authenticate_socket_user(id_token)
             except Exception as e:
                 emit('error', {'message': f'Authentication failed: {str(e)}'})
                 return
