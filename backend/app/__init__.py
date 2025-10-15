@@ -98,8 +98,31 @@ def create_app(config_class=Config):
     def health_check():
         return {'status': 'healthy', 'message': 'CollabCanvas API is running'}, 200
     
+    @app.route('/test-firebase')
+    def test_firebase():
+        try:
+            from app.services.auth_service import AuthService
+            auth_service = AuthService()
+            return {
+                'status': 'success',
+                'message': 'Firebase service initialized',
+                'has_mock_firebase': hasattr(auth_service, '_mock_firebase') and auth_service._mock_firebase
+            }, 200
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Firebase service failed: {str(e)}'
+            }, 500
+    
     @app.route('/')
     def root():
-        return {'message': 'CollabCanvas API', 'version': '1.0.0'}, 200
+        from datetime import datetime
+        return {
+            'message': 'CollabCanvas API', 
+            'version': '1.0.0',
+            'branch': 'forpk',
+            'timestamp': str(datetime.utcnow()),
+            'status': 'healthy'
+        }, 200
     
     return app
