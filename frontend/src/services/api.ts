@@ -178,4 +178,9 @@ export const collaborationAPI = {
     const response = await api.get(`/collaboration/canvas/${canvasId}/invitations`)
     return response.data
   },
+  
+  resendInvitation: async (invitationId: string): Promise<{ invitation: Invitation }> => {
+    const response = await api.post(`/collaboration/invitations/${invitationId}/resend`)
+    return response.data
+  },
 }

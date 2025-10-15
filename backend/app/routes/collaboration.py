@@ -126,6 +126,60 @@ def invite_user(current_user):
 def get_invitations(current_user):
     """Get all pending invitations for the current user."""
     try:
+        invitations = collaboration_service.get_user_invitations(current_user.id)
+        return jsonify({
+            'invitations': [invitation.to_dict() for invitation in invitations]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@collaboration_bp.route('/canvas/<canvas_id>/invitations', methods=['GET'])
+@require_auth
+def get_canvas_invitations(current_user, canvas_id):
+    """Get all invitations for a specific canvas."""
+    try:
+        # Check if user is canvas owner
+        canvas = canvas_service.get_canvas_by_id(canvas_id)
+        if not canvas or canvas.owner_id != current_user.id:
+            return jsonify({'error': 'Only the canvas owner can view invitations'}), 403
+        
+        invitations = collaboration_service.get_canvas_invitations(canvas_id)
+        return jsonify({
+            'invitations': [invitation.to_dict() for invitation in invitations]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@collaboration_bp.route('/invitations/<invitation_id>/resend', methods=['POST'])
+@require_auth
+def resend_invitation(current_user, invitation_id):
+    """Resend an invitation email."""
+    try:
+        invitation = collaboration_service.resend_invitation(invitation_id, current_user.id)
+        return jsonify({
+            'message': 'Invitation resent successfully',
+            'invitation': invitation.to_dict()
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@collaboration_bp.route('/invitations/<invitation_id>', methods=['GET'])
+def get_invitation_details(invitation_id):
+    """Get invitation details (public endpoint for invitation links)."""
+    try:
+        invitation = collaboration_service.get_invitation_by_id(invitation_id)
+        if not invitation:
+            return jsonify({'error': 'Invitation not found'}), 404
+        
+        if invitation.is_expired():
+            return jsonify({'error': 'Invitation has expired'}), 410
+        
+        return jsonify({
+            'invitation': invitation.to_dict()
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    try:
         invitations = collaboration_service.get_user_invitations(current_user.email)
         return jsonify({
             'invitations': [invitation.to_dict() for invitation in invitations]

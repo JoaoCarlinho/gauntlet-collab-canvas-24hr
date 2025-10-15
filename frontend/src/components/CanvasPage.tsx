@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Stage, Layer, Rect, Circle, Text } from 'react-konva'
-import { ArrowLeft, Users, Settings } from 'lucide-react'
+import { ArrowLeft, Users, Settings, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
-import { Canvas, CanvasObject, CursorData, OnlineUser } from '../types'
+import { Canvas, CanvasObject, CursorData } from '../types'
 import toast from 'react-hot-toast'
+import InviteCollaboratorModal from './InviteCollaboratorModal'
+import PresenceIndicators from './PresenceIndicators'
+import UserStatus from './UserStatus'
+import CollaborationSidebar from './CollaborationSidebar'
+import NotificationCenter from './NotificationCenter'
 
 const CanvasPage: React.FC = () => {
   const { canvasId } = useParams<{ canvasId: string }>()
@@ -18,11 +23,12 @@ const CanvasPage: React.FC = () => {
   const [canvas, setCanvas] = useState<Canvas | null>(null)
   const [objects, setObjects] = useState<CanvasObject[]>([])
   const [cursors, setCursors] = useState<CursorData[]>([])
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTool, setSelectedTool] = useState<'select' | 'rectangle' | 'circle' | 'text'>('select')
   const [isDrawing, setIsDrawing] = useState(false)
   const [newObject, setNewObject] = useState<Partial<CanvasObject> | null>(null)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [showCollaborationSidebar, setShowCollaborationSidebar] = useState(false)
   
   const stageRef = useRef<any>(null)
   const idToken = localStorage.getItem('idToken')
@@ -133,9 +139,7 @@ const CanvasPage: React.FC = () => {
       toast(`${data.user_name} left the canvas`)
     })
 
-    socketService.on('online_users', (data: { users: OnlineUser[] }) => {
-      setOnlineUsers(data.users)
-    })
+    // Online users are now handled by PresenceIndicators component
   }
 
   const handleStageClick = (e: any) => {
@@ -429,10 +433,12 @@ const CanvasPage: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <Users className="w-4 h-4" />
-            <span>{onlineUsers.length} online</span>
-          </div>
+          {/* Presence Indicators */}
+          <PresenceIndicators 
+            canvasId={canvasId!} 
+            currentUserId={user?.id || ''} 
+            maxVisible={3}
+          />
           
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -440,6 +446,42 @@ const CanvasPage: React.FC = () => {
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
+          
+          {/* User Status */}
+          {user && (
+            <UserStatus 
+              compact={true}
+            />
+          )}
+          
+          {/* Collaboration buttons - only show for canvas owner */}
+          {canvas && user && canvas.owner_id === user.id && (
+            <>
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="flex items-center space-x-2 px-3 py-1.5 text-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                title="Invite collaborators"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Invite</span>
+              </button>
+              
+              <button
+                onClick={() => setShowCollaborationSidebar(!showCollaborationSidebar)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showCollaborationSidebar 
+                    ? 'text-primary-600 bg-primary-50' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                title="Collaboration panel"
+              >
+                <Users className="w-5 h-5" />
+              </button>
+            </>
+          )}
+          
+          {/* Notification Center */}
+          <NotificationCenter />
           
           <button className="p-2 hover:bg-gray-100 rounded-lg">
             <Settings className="w-5 h-5" />
@@ -523,6 +565,28 @@ const CanvasPage: React.FC = () => {
           </Layer>
         </Stage>
       </div>
+
+      {/* Collaboration Sidebar */}
+      {canvas && user && (
+        <CollaborationSidebar
+          canvasId={canvasId!}
+          canvasTitle={canvas.title}
+          currentUserId={user.id}
+          isOwner={canvas.owner_id === user.id}
+          isOpen={showCollaborationSidebar}
+          onClose={() => setShowCollaborationSidebar(false)}
+        />
+      )}
+
+      {/* Invitation Modal */}
+      {canvas && (
+        <InviteCollaboratorModal
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          canvasId={canvasId!}
+          canvasTitle={canvas.title}
+        />
+      )}
     </div>
   )
 }
