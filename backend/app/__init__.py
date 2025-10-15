@@ -93,6 +93,14 @@ def create_app(config_class=Config):
     from .socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
     
+    # Create database tables
+    with app.app_context():
+        try:
+            db.create_all()
+            print("Database tables created successfully")
+        except Exception as e:
+            print(f"Error creating database tables: {e}")
+    
     # Add health check endpoint
     @app.route('/health')
     def health_check():
