@@ -7,7 +7,10 @@ import {
   GoogleAuthProvider, 
   signOut,
   AuthError,
-  User
+  User,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth'
 
 const firebaseConfig = {
@@ -22,6 +25,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+
+// Configure Firebase auth persistence
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Failed to set auth persistence:', error)
+  // Fallback to session persistence if local fails
+  setPersistence(auth, browserSessionPersistence).catch((fallbackError) => {
+    console.error('Failed to set session persistence:', fallbackError)
+  })
+})
 
 const googleProvider = new GoogleAuthProvider()
 // Add additional scopes if needed
@@ -257,4 +269,35 @@ export const signOutUser = async () => {
       error as AuthError
     )
   }
+}
+
+// Helper function to refresh Firebase ID token
+export const refreshFirebaseToken = async (): Promise<string | null> => {
+  try {
+    const currentUser = auth.currentUser
+    if (currentUser) {
+      console.log('Refreshing Firebase ID token...')
+      const token = await currentUser.getIdToken(true) // Force refresh
+      console.log('Token refreshed successfully')
+      return token
+    }
+    return null
+  } catch (error) {
+    console.error('Failed to refresh Firebase token:', error)
+    return null
+  }
+}
+
+// Helper function to check if user is still authenticated
+export const isUserAuthenticated = (): boolean => {
+  const currentUser = auth.currentUser
+  const hasToken = localStorage.getItem('idToken')
+  
+  console.log('Auth check:', {
+    hasFirebaseUser: !!currentUser,
+    hasStoredToken: !!hasToken,
+    userEmail: currentUser?.email
+  })
+  
+  return !!(currentUser && hasToken)
 }

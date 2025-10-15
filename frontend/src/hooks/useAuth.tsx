@@ -5,7 +5,9 @@ import {
   signInWithGoogle, 
   signOutUser, 
   getGoogleRedirectResult,
-  AuthenticationError 
+  AuthenticationError,
+  refreshFirebaseToken,
+  isUserAuthenticated
 } from '../services/firebase'
 import { authAPI } from '../services/api'
 import { User, AuthState } from '../types'
@@ -44,6 +46,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!isRedirectFlow) {
         console.log('Not a redirect flow - skipping redirect result check')
+        
+        // Check if user is already authenticated
+        if (isUserAuthenticated()) {
+          console.log('User appears to be authenticated, refreshing token...')
+          const refreshedToken = await refreshFirebaseToken()
+          if (refreshedToken) {
+            localStorage.setItem('idToken', refreshedToken)
+            console.log('Token refreshed, user should remain authenticated')
+          }
+        }
+        
         setIsLoading(false)
         return
       }
@@ -210,6 +223,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log('React state - isLoading:', isLoading)
   }
 
+  // Set up periodic token refresh
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const refreshInterval = setInterval(async () => {
+      console.log('Periodic token refresh check...')
+      const refreshedToken = await refreshFirebaseToken()
+      if (refreshedToken) {
+        localStorage.setItem('idToken', refreshedToken)
+        console.log('Token refreshed successfully')
+      } else {
+        console.log('Token refresh failed - user may need to re-authenticate')
+      }
+    }, 50 * 60 * 1000) // Refresh every 50 minutes (tokens expire after 1 hour)
+
+    return () => clearInterval(refreshInterval)
+  }, [isAuthenticated])
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       console.log('=== Firebase auth state changed ===')
@@ -239,6 +270,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } catch (error) {
           console.error('=== Failed to get user data from backend ===')
           console.error('Error details:', error)
+          
+          // Try to refresh token and retry
+          console.log('Attempting to refresh token and retry...')
+          try {
+            const refreshedToken = await refreshFirebaseToken()
+            if (refreshedToken) {
+              localStorage.setItem('idToken', refreshedToken)
+              console.log('Token refreshed, retrying API call...')
+              const retryResponse = await authAPI.getCurrentUser()
+              setUser(retryResponse.user)
+              setIsAuthenticated(true)
+              console.log('=== User authenticated successfully after retry ===')
+              return
+            }
+          } catch (retryError) {
+            console.error('Retry also failed:', retryError)
+          }
+          
           setUser(null)
           setIsAuthenticated(false)
         }
