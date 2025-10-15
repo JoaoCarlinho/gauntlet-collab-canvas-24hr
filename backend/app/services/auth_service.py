@@ -33,8 +33,13 @@ class AuthService:
                 # Fix private key formatting - replace escaped newlines with actual newlines
                 private_key = os.environ.get('FIREBASE_PRIVATE_KEY', '')
                 if private_key:
+                    print(f"Original private key length: {len(private_key)}")
+                    print(f"Original private key contains \\n: {'\\n' in private_key}")
+                    print(f"Original private key contains actual newlines: {'\n' in private_key}")
+                    
                     # Replace escaped newlines with actual newlines
                     private_key = private_key.replace('\\n', '\n')
+                    
                     # Ensure proper PEM format
                     if not private_key.startswith('-----BEGIN PRIVATE KEY-----'):
                         private_key = '-----BEGIN PRIVATE KEY-----\n' + private_key
@@ -44,12 +49,23 @@ class AuthService:
                         else:
                             private_key += '\n-----END PRIVATE KEY-----\n'
                     
-                    print(f"Private key after formatting - contains actual newlines: {'\n' in private_key}")
+                    print(f"Formatted private key length: {len(private_key)}")
+                    print(f"Formatted private key contains actual newlines: {'\n' in private_key}")
+                    print(f"Formatted private key starts with: {private_key[:50]}...")
+                    print(f"Formatted private key ends with: ...{private_key[-50:]}")
                 
                 # Check if Firebase is already initialized
                 try:
-                    firebase_admin.get_app()
+                    existing_app = firebase_admin.get_app()
                     print("Firebase already initialized")
+                    
+                    # If Firebase is already initialized but we have a formatted private key,
+                    # we might need to reinitialize with the correct key
+                    if private_key and '\\n' not in private_key and '\n' in private_key:
+                        print("Private key appears to be properly formatted, Firebase should work")
+                    else:
+                        print("Warning: Private key may not be properly formatted")
+                        
                 except ValueError:
                     # Initialize Firebase with service account
                     firebase_config = {
