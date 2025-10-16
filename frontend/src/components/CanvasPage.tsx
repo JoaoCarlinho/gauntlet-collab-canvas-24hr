@@ -15,6 +15,7 @@ import { stateSyncManager, StateConflict } from '../services/stateSyncManager'
 import { updateQueueManager, QueueStats } from '../services/updateQueueManager'
 import { connectionMonitor } from '../services/connectionMonitor'
 import { offlineManager } from '../services/offlineManager'
+import { objectUpdateDebouncer } from '../utils/debounce'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
@@ -116,6 +117,14 @@ const CanvasPage: React.FC = () => {
     cacheSize: 0
   })
   
+  // Debouncing state
+  const [debouncedObjects, setDebouncedObjects] = useState<Set<string>>(new Set())
+  const [debounceStats, setDebounceStats] = useState({
+    totalObjects: 0,
+    pendingObjects: 0,
+    queuedUpdates: 0
+  })
+  
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -209,6 +218,23 @@ const CanvasPage: React.FC = () => {
   useEffect(() => {
     updateQueueManager.setConnectionStatus(isConnected)
   }, [isConnected])
+
+  // Update debounce stats periodically
+  useEffect(() => {
+    const updateDebounceStats = () => {
+      const stats = objectUpdateDebouncer.getStats()
+      setDebounceStats(stats)
+      setDebouncedObjects(new Set(objectUpdateDebouncer.getPendingObjects()))
+    }
+
+    // Update stats immediately
+    updateDebounceStats()
+
+    // Update stats every 2 seconds
+    const interval = setInterval(updateDebounceStats, 2000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Handle tool selection changes for pointer indicators and cursor
   useEffect(() => {
@@ -684,7 +710,17 @@ const CanvasPage: React.FC = () => {
     setEditingObjectId(null)
   }
 
-  const handleObjectResize = async (objectId: string, newProperties: any) => {
+  const handleObjectUpdatePosition = (objectId: string, x: number, y: number) => {
+    // Use debounced update for position changes
+    debouncedPositionUpdate(objectId, x, y)
+    
+    // Immediately update local state for responsive UI
+    setObjects(prev => prev.map(obj => 
+      obj.id === objectId ? { ...obj, x, y } : obj
+    ))
+  }
+
+  const performObjectResize = async (objectId: string, newProperties: any) => {
     if (!idToken || !canvasId) return
 
     // Check if we're offline and handle accordingly
@@ -787,7 +823,35 @@ const CanvasPage: React.FC = () => {
     }
   }
 
-  const handleObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
+  const handleObjectResize = (objectId: string, newProperties: any) => {
+    // Use debounced update for resize changes
+    debouncedResizeUpdate(objectId, newProperties)
+    
+    // Immediately update local state for responsive UI
+    setObjects(prev => prev.map(obj => 
+      obj.id === objectId ? { ...obj, properties: { ...obj.properties, ...newProperties } } : obj
+    ))
+  }
+
+  // Create debounced version of position update
+  const debouncedPositionUpdate = objectUpdateDebouncer.debounceUpdate(
+    'position_update',
+    async (objectId: string, x: number, y: number) => {
+      await performObjectUpdatePosition(objectId, x, y)
+    },
+    'high' // High priority for position updates
+  )
+
+  // Create debounced version of resize update
+  const debouncedResizeUpdate = objectUpdateDebouncer.debounceUpdate(
+    'resize_update',
+    async (objectId: string, newProperties: any) => {
+      await performObjectResize(objectId, newProperties)
+    },
+    'normal' // Normal priority for resize updates
+  )
+
+  const performObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
     if (!idToken || !canvasId) return
 
     // Find the current object
@@ -2048,6 +2112,18 @@ const CanvasPage: React.FC = () => {
                   <strong>Socket Connected:</strong> {isConnected ? 'Yes' : 'No'}
                 </div>
                 
+                <div>
+                  <strong>Debounced Objects:</strong> {debounceStats.totalObjects}
+                </div>
+                
+                <div>
+                  <strong>Pending Debounced Updates:</strong> {debounceStats.pendingObjects}
+                </div>
+                
+                <div>
+                  <strong>Queued Debounced Updates:</strong> {debounceStats.queuedUpdates}
+                </div>
+                
                 {updatingObjects.size > 0 && (
                   <div className="mt-2">
                     <strong>Update Progress:</strong>
@@ -2116,6 +2192,20 @@ const CanvasPage: React.FC = () => {
                     className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
                   >
                     Log Loading Stats
+                  </button>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const stats = objectUpdateDebouncer.getStats()
+                      console.log('Debounce Statistics:', stats)
+                      console.log('Pending Objects:', objectUpdateDebouncer.getPendingObjects())
+                      toast.success('Debounce stats logged to console')
+                    }}
+                    className="bg-indigo-500 text-white px-2 py-1 rounded text-xs hover:bg-indigo-600"
+                  >
+                    Log Debounce Stats
                   </button>
                 </div>
               </div>
