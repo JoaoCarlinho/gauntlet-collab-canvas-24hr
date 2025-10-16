@@ -9,6 +9,9 @@ import { socketService } from '../services/socket'
 import { Canvas, CanvasObject, CursorData } from '../types'
 import { errorLogger } from '../utils/errorLogger'
 import { objectUpdateService } from '../services/objectUpdateService'
+import { optimisticUpdateManager } from '../services/optimisticUpdateManager'
+import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
+import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -66,6 +69,10 @@ const CanvasPage: React.FC = () => {
   // Update progress tracking
   const [updatingObjects, setUpdatingObjects] = useState<Set<string>>(new Set())
   const [updateProgress, setUpdateProgress] = useState<Map<string, { method: string; attempt: number }>>(new Map())
+  
+  // Optimistic update tracking
+  const [optimisticObjects, setOptimisticObjects] = useState<Set<string>>(new Set())
+  const [successAnimations, setSuccessAnimations] = useState<Array<{ id: string; x: number; y: number }>>([])
   
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
@@ -393,7 +400,20 @@ const CanvasPage: React.FC = () => {
   const handleObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
     if (!idToken || !canvasId) return
 
-    // Mark object as updating
+    // Find the current object
+    const currentObject = objects.find(obj => obj.id === objectId)
+    if (!currentObject) return
+
+    // Start optimistic update - immediately update local state
+    const optimisticState = optimisticUpdateManager.startOptimisticUpdate(
+      objectId,
+      currentObject,
+      { x, y },
+      'position'
+    )
+
+    // Mark object as optimistically updating
+    setOptimisticObjects(prev => new Set(prev).add(objectId))
     setUpdatingObjects(prev => new Set(prev).add(objectId))
     setUpdateProgress(prev => new Map(prev).set(objectId, { method: 'socket', attempt: 1 }))
 
@@ -405,7 +425,7 @@ const CanvasPage: React.FC = () => {
         x,
         y,
         {
-          useOptimisticUpdate: true,
+          useOptimisticUpdate: false, // We're handling optimistic updates manually
           retryOptions: {
             maxAttempts: 3,
             baseDelay: 1000,
@@ -420,19 +440,39 @@ const CanvasPage: React.FC = () => {
       )
 
       if (result.success) {
-        // Update successful - remove from failed updates if it was there
+        // Confirm optimistic update
+        optimisticUpdateManager.confirmOptimisticUpdate(objectId, result.object!)
+        
+        // Remove from failed updates if it was there
         setFailedUpdates(prev => {
           const newMap = new Map(prev)
           newMap.delete(objectId)
           return newMap
         })
 
+        // Show success animation
+        setSuccessAnimations(prev => [...prev, {
+          id: `${objectId}_${Date.now()}`,
+          x: x + (currentObject.properties.width || 100) / 2,
+          y: y + (currentObject.properties.height || 100) / 2
+        }])
+
         // Show success message for REST fallback
         if (result.method === 'rest') {
           toast.success('Object updated (using backup method)', { duration: 2000 })
         }
       } else {
-        // Update failed - track for retry
+        // Rollback optimistic update
+        const originalState = optimisticUpdateManager.rollbackOptimisticUpdate(objectId)
+        
+        if (originalState) {
+          // Update local state to original position
+          setObjects(prev => prev.map(obj => 
+            obj.id === objectId ? originalState : obj
+          ))
+        }
+
+        // Track for retry
         setFailedUpdates(prev => {
           const newMap = new Map(prev)
           newMap.set(objectId, {
@@ -457,9 +497,23 @@ const CanvasPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Unexpected error in handleObjectUpdatePosition:', error)
+      
+      // Rollback optimistic update
+      const originalState = optimisticUpdateManager.rollbackOptimisticUpdate(objectId)
+      if (originalState) {
+        setObjects(prev => prev.map(obj => 
+          obj.id === objectId ? originalState : obj
+        ))
+      }
+      
       toast.error('Unexpected error occurred while updating object')
     } finally {
       // Clean up update tracking
+      setOptimisticObjects(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(objectId)
+        return newSet
+      })
       setUpdatingObjects(prev => {
         const newSet = new Set(prev)
         newSet.delete(objectId)
@@ -479,6 +533,10 @@ const CanvasPage: React.FC = () => {
 
   const handleCursorReset = () => {
     cursorManager.resetCursor()
+  }
+
+  const handleSuccessAnimationComplete = (animationId: string) => {
+    setSuccessAnimations(prev => prev.filter(anim => anim.id !== animationId))
   }
 
   // Cursor tooltip handlers
@@ -744,10 +802,16 @@ const CanvasPage: React.FC = () => {
   }
 
   const renderObject = (obj: CanvasObject) => {
-    const props = obj.properties
+    // Get optimistic state if available
+    const optimisticObject = optimisticUpdateManager.getOptimisticObject(obj.id, obj)
+    const displayObject = optimisticObject
+    const props = displayObject.properties
     const isSelected = selectedObjectId === obj.id
     const isEditing = editingObjectId === obj.id
     const isHovered = hoveredObjectId === obj.id
+    const isOptimistic = optimisticObjects.has(obj.id)
+    const isUpdating = updatingObjects.has(obj.id)
+    const progress = updateProgress.get(obj.id)
 
     switch (obj.object_type) {
       case 'rectangle':
@@ -768,16 +832,25 @@ const CanvasPage: React.FC = () => {
               onMouseLeave={() => setHoveredObjectId(null)}
             />
             <SelectionIndicator 
-              object={obj} 
+              object={displayObject} 
               isSelected={isSelected} 
               isHovered={isHovered && !isSelected} 
             />
             <ResizeHandles 
-              object={obj} 
+              object={displayObject} 
               isSelected={isSelected} 
               onResize={handleObjectResize}
               onCursorChange={handleCursorChange}
               onCursorReset={handleCursorReset}
+            />
+            
+            {/* Optimistic update indicator */}
+            <OptimisticUpdateIndicator
+              object={displayObject}
+              isUpdating={isUpdating}
+              updateMethod={progress?.method as 'socket' | 'rest'}
+              attempt={progress?.attempt}
+              showProgress={true}
             />
           </Group>
         )
@@ -1349,6 +1422,16 @@ const CanvasPage: React.FC = () => {
           {objects.map(renderObject)}
           {renderNewObject()}
           {renderCursors()}
+          
+          {/* Success animations */}
+          {successAnimations.map(animation => (
+            <UpdateSuccessAnimation
+              key={animation.id}
+              x={animation.x}
+              y={animation.y}
+              onComplete={() => handleSuccessAnimationComplete(animation.id)}
+            />
+          ))}
           {pointerIndicator && (
             <PointerIndicator
               toolId={pointerIndicator.toolId}
@@ -1442,6 +1525,14 @@ const CanvasPage: React.FC = () => {
                 </div>
                 
                 <div>
+                  <strong>Optimistic Updates:</strong> {optimisticObjects.size}
+                </div>
+                
+                <div>
+                  <strong>Success Animations:</strong> {successAnimations.length}
+                </div>
+                
+                <div>
                   <strong>Socket Connected:</strong> {isConnected ? 'Yes' : 'No'}
                 </div>
                 
@@ -1487,6 +1578,19 @@ const CanvasPage: React.FC = () => {
                     className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
                   >
                     Export Error Log
+                  </button>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const stats = optimisticUpdateManager.getOptimisticUpdateStats()
+                      console.log('Optimistic Update Statistics:', stats)
+                      toast.success('Optimistic update stats logged to console')
+                    }}
+                    className="bg-purple-500 text-white px-2 py-1 rounded text-xs hover:bg-purple-600"
+                  >
+                    Log Optimistic Stats
                   </button>
                 </div>
               </div>
