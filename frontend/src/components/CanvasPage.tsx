@@ -13,6 +13,8 @@ import { optimisticUpdateManager } from '../services/optimisticUpdateManager'
 import { loadingStateManager } from '../services/loadingStateManager'
 import { stateSyncManager, StateConflict } from '../services/stateSyncManager'
 import { updateQueueManager, QueueStats } from '../services/updateQueueManager'
+import { connectionMonitor } from '../services/connectionMonitor'
+import { offlineManager } from '../services/offlineManager'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
@@ -20,6 +22,8 @@ import ConflictResolutionDialog from './ConflictResolutionDialog'
 import SyncStatusIndicator from './SyncStatusIndicator'
 import QueueStatusIndicator from './QueueStatusIndicator'
 import QueueManagementDialog from './QueueManagementDialog'
+import ConnectionStatusIndicator from './ConnectionStatusIndicator'
+import OfflineIndicator from './OfflineIndicator'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -98,6 +102,20 @@ const CanvasPage: React.FC = () => {
   const [queueStats, setQueueStats] = useState<QueueStats>(updateQueueManager.getStats())
   const [showQueueDialog, setShowQueueDialog] = useState(false)
   
+  // Connection monitoring and offline mode state
+  const [connectionMetrics, setConnectionMetrics] = useState({
+    latency: 0,
+    stability: 0,
+    quality: 'excellent' as 'excellent' | 'good' | 'fair' | 'poor' | 'offline',
+    uptime: 0
+  })
+  const [isOffline, setIsOffline] = useState(false)
+  const [offlineData, setOfflineData] = useState({
+    pendingUpdates: 0,
+    lastSyncTime: 0,
+    cacheSize: 0
+  })
+  
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -145,6 +163,12 @@ const CanvasPage: React.FC = () => {
     // Initialize update queue
     initializeUpdateQueue()
 
+    // Initialize connection monitoring
+    initializeConnectionMonitoring()
+
+    // Initialize offline mode
+    initializeOfflineMode()
+
     return () => {
       if (idToken) {
         socketService.leaveCanvas(canvasId!, idToken)
@@ -154,6 +178,10 @@ const CanvasPage: React.FC = () => {
       stateSyncManager.stopAutoSync()
       // Clean up update queue
       updateQueueManager.stopAutoProcessing()
+      // Clean up connection monitoring
+      connectionMonitor.stop()
+      // Clean up offline mode
+      offlineManager.stop()
     }
   }, [isAuthenticated, canvasId, isConnected])
 
@@ -478,6 +506,60 @@ const CanvasPage: React.FC = () => {
     }
   }
 
+  // Connection monitoring functions
+  const initializeConnectionMonitoring = () => {
+    // Set up connection status callback
+    connectionMonitor.onStatusChange((status) => {
+      setConnectionMetrics(prev => ({
+        ...prev,
+        latency: status.latency,
+        stability: status.stability,
+        quality: status.quality,
+        uptime: status.uptime
+      }))
+    })
+
+    // Set up connection quality callback
+    connectionMonitor.onQualityChange((quality) => {
+      setConnectionMetrics(prev => ({
+        ...prev,
+        quality
+      }))
+    })
+
+    // Start monitoring
+    connectionMonitor.start()
+  }
+
+  // Offline mode functions
+  const initializeOfflineMode = () => {
+    // Set up offline status callback
+    offlineManager.onOfflineStatusChange((isOffline) => {
+      setIsOffline(isOffline)
+    })
+
+    // Set up offline data callback
+    offlineManager.onOfflineDataChange((data) => {
+      setOfflineData({
+        pendingUpdates: data.pendingUpdates,
+        lastSyncTime: data.lastSyncTime,
+        cacheSize: data.cacheSize
+      })
+    })
+
+    // Set up sync callback
+    offlineManager.onSyncComplete((result) => {
+      if (result.success) {
+        toast.success(`Synced ${result.syncedCount} updates`)
+      } else {
+        toast.error(`Sync failed: ${result.error}`)
+      }
+    })
+
+    // Start offline mode
+    offlineManager.start()
+  }
+
   // New handler functions for enhanced interactions
   const handleObjectSelect = (objectId: string) => {
     if (selectedTool.id === 'select') {
@@ -502,6 +584,27 @@ const CanvasPage: React.FC = () => {
 
   const handleObjectResize = async (objectId: string, newProperties: any) => {
     if (!idToken || !canvasId) return
+
+    // Check if we're offline and handle accordingly
+    if (isOffline) {
+      // Store update in offline cache
+      offlineManager.cacheUpdate({
+        canvasId,
+        objectId,
+        operation: 'resize',
+        data: newProperties,
+        timestamp: Date.now(),
+        priority: 'high'
+      })
+      
+      // Update local state optimistically
+      setObjects(prev => prev.map(obj => 
+        obj.id === objectId ? { ...obj, properties: { ...obj.properties, ...newProperties } } : obj
+      ))
+      
+      toast.info('Resize saved offline - will sync when connection is restored', { duration: 3000 })
+      return
+    }
 
     // Mark object as updating
     setUpdatingObjects(prev => new Set(prev).add(objectId))
@@ -588,6 +691,27 @@ const CanvasPage: React.FC = () => {
     // Find the current object
     const currentObject = objects.find(obj => obj.id === objectId)
     if (!currentObject) return
+
+    // Check if we're offline and handle accordingly
+    if (isOffline) {
+      // Store update in offline cache
+      offlineManager.cacheUpdate({
+        canvasId,
+        objectId,
+        operation: 'position',
+        data: { x, y },
+        timestamp: Date.now(),
+        priority: 'high'
+      })
+      
+      // Update local state optimistically
+      setObjects(prev => prev.map(obj => 
+        obj.id === objectId ? { ...obj, x, y } : obj
+      ))
+      
+      toast.info('Update saved offline - will sync when connection is restored', { duration: 3000 })
+      return
+    }
 
     // Start loading state
     const canStartLoading = loadingStateManager.startLoading(
@@ -1596,6 +1720,20 @@ const CanvasPage: React.FC = () => {
               status={syncStatus}
               onManualSync={handleManualSync}
               onShowConflicts={() => setShowConflictDialog(true)}
+            />
+
+            {/* Connection Status Indicator */}
+            <ConnectionStatusIndicator
+              metrics={connectionMetrics}
+              isConnected={isConnected}
+            />
+
+            {/* Offline Indicator */}
+            <OfflineIndicator
+              isOffline={isOffline}
+              offlineData={offlineData}
+              onForceSync={() => offlineManager.forceSync()}
+              onClearCache={() => offlineManager.clearCache()}
             />
             
             {/* Queue Status Indicator */}
