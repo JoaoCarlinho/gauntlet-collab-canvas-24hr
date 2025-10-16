@@ -547,6 +547,31 @@ class OfflineManager extends EventEmitter {
   isSyncInProgress(): boolean {
     return this.state.syncInProgress
   }
+
+  /**
+   * Handle connection loss event
+   */
+  handleConnectionLoss(): void {
+    console.log('OfflineManager: Handling connection loss')
+    
+    // Set offline status
+    this.state.isOffline = true
+    this.state.lastOnline = Date.now()
+    
+    // Emit offline status change
+    this.emit('offlineStatusChange', true)
+    
+    // Log the event
+    errorLogger.log('Connection lost - entering offline mode', {
+      context: 'offline_manager',
+      level: 'info',
+      metadata: {
+        pendingUpdates: this.state.pendingUpdates.length,
+        cachedObjects: this.state.cachedObjects.size,
+        totalOfflineTime: this.state.totalOfflineTime
+      }
+    })
+  }
 }
 
 // Create singleton instance

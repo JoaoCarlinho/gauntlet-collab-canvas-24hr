@@ -357,6 +357,62 @@ const CanvasPage: React.FC = () => {
       toast.error(errorMessage, { duration: 4000 })
     })
 
+    // Reconnection event listeners
+    socketService.on('connection_restored', (data: { socketId: string; timestamp: number }) => {
+      console.log('Connection restored:', data)
+      setConnectionStatus('connected')
+      
+      // Trigger state synchronization
+      if (canvasId) {
+        handleReconnectionSync()
+      }
+      
+      toast.success('Connection restored', { duration: 2000 })
+    })
+
+    socketService.on('connection_lost', (data: { reason: string; timestamp: number }) => {
+      console.log('Connection lost:', data)
+      setConnectionStatus('disconnected')
+      
+      // Notify offline manager
+      offlineManager.handleConnectionLoss()
+      
+      toast.warning(`Connection lost: ${data.reason}`, { duration: 3000 })
+    })
+
+    socketService.on('reconnection_attempt', (data: { attempt: number; timestamp: number }) => {
+      console.log(`Reconnection attempt ${data.attempt}`)
+      
+      toast.loading(`Reconnecting... (attempt ${data.attempt})`, {
+        id: 'reconnection',
+        duration: 5000
+      })
+    })
+
+    socketService.on('reconnection_success', (data: { attempt: number; timestamp: number }) => {
+      console.log(`Reconnection successful after ${data.attempt} attempts`)
+      
+      toast.dismiss('reconnection')
+      toast.success(`Reconnected after ${data.attempt} attempts`, { duration: 3000 })
+    })
+
+    socketService.on('reconnection_failed', (data: { error: string; timestamp: number }) => {
+      console.error('Reconnection failed:', data)
+      
+      toast.dismiss('reconnection')
+      toast.error(`Reconnection failed: ${data.error}`, { duration: 4000 })
+    })
+
+    socketService.on('reconnection_exhausted', (data: { timestamp: number }) => {
+      console.error('Reconnection exhausted - max attempts reached')
+      
+      toast.dismiss('reconnection')
+      toast.error('Connection lost - please refresh the page', { duration: 6000 })
+      
+      // Set offline mode
+      setIsOffline(true)
+    })
+
     // Online users are now handled by PresenceIndicators component
   }
 
@@ -558,6 +614,52 @@ const CanvasPage: React.FC = () => {
 
     // Start offline mode
     offlineManager.start()
+  }
+
+  // Reconnection synchronization function
+  const handleReconnectionSync = async () => {
+    if (!canvasId || !idToken) return
+
+    console.log('Starting reconnection sync...')
+    
+    try {
+      // 1. Sync offline cached updates
+      const syncResult = await offlineManager.syncPendingUpdates()
+      if (syncResult.success && syncResult.syncedCount > 0) {
+        toast.success(`Synced ${syncResult.syncedCount} offline updates`, { duration: 3000 })
+      }
+
+      // 2. Refresh canvas state from server
+      await loadObjects()
+      
+      // 3. Trigger state synchronization
+      const stateSyncResult = await stateSyncManager.syncState(canvasId, objects, {
+        forceSync: true,
+        resolveConflicts: 'server_wins'
+      })
+      
+      if (stateSyncResult.hasConflicts) {
+        toast.warning(`${stateSyncResult.conflicts.length} conflicts detected after reconnection`, {
+          duration: 4000
+        })
+        setShowConflictDialog(true)
+      }
+
+      // 4. Process any queued updates
+      updateQueueManager.processQueue()
+
+      // 5. Update connection status
+      setConnectionStatus('connected')
+      setIsOffline(false)
+      
+      console.log('Reconnection sync completed successfully')
+      
+    } catch (error) {
+      console.error('Reconnection sync failed:', error)
+      toast.error('Failed to sync after reconnection - some data may be outdated', {
+        duration: 5000
+      })
+    }
   }
 
   // New handler functions for enhanced interactions

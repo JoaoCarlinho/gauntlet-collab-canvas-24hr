@@ -36,6 +36,12 @@ class SocketService {
         console.log('=== Socket.IO Connected Successfully ===')
         console.log('Socket ID:', this.socket?.id)
       }
+      
+      // Notify connection monitor of successful connection
+      this.emit('connection_restored', {
+        socketId: this.socket?.id,
+        timestamp: Date.now()
+      })
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -43,6 +49,55 @@ class SocketService {
         console.log('=== Socket.IO Disconnected ===')
         console.log('Reason:', reason)
       }
+      
+      // Notify connection monitor of disconnection
+      this.emit('connection_lost', {
+        reason,
+        timestamp: Date.now()
+      })
+    })
+
+    // Track reconnection attempts
+    this.socket.on('reconnect_attempt', (attemptNumber) => {
+      if (this.debugMode) {
+        console.log('=== Socket.IO Reconnection Attempt ===')
+        console.log('Attempt:', attemptNumber)
+      }
+      
+      this.emit('reconnection_attempt', {
+        attempt: attemptNumber,
+        timestamp: Date.now()
+      })
+    })
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      if (this.debugMode) {
+        console.log('=== Socket.IO Reconnected ===')
+        console.log('Attempt:', attemptNumber)
+      }
+      
+      this.emit('reconnection_success', {
+        attempt: attemptNumber,
+        timestamp: Date.now()
+      })
+    })
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('=== Socket.IO Reconnection Error ===')
+      console.error('Error:', error)
+      
+      this.emit('reconnection_failed', {
+        error: error.message,
+        timestamp: Date.now()
+      })
+    })
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('=== Socket.IO Reconnection Failed - Max Attempts Reached ===')
+      
+      this.emit('reconnection_exhausted', {
+        timestamp: Date.now()
+      })
     })
 
     // Always log errors, regardless of debug mode
