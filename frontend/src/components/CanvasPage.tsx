@@ -16,6 +16,7 @@ import { updateQueueManager, QueueStats } from '../services/updateQueueManager'
 import { connectionMonitor } from '../services/connectionMonitor'
 import { offlineManager } from '../services/offlineManager'
 import { objectUpdateDebouncer } from '../utils/debounce'
+import { batchUpdateManager, useBatchUpdates } from '../utils/batchUpdates'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
@@ -123,6 +124,24 @@ const CanvasPage: React.FC = () => {
     totalObjects: 0,
     pendingObjects: 0,
     queuedUpdates: 0
+  })
+  
+  // Batch updates state
+  const { addUpdate: addBatchUpdate, getStats: getBatchStats, getQueueStatus } = useBatchUpdates()
+  const [batchStats, setBatchStats] = useState({
+    totalBatches: 0,
+    successfulBatches: 0,
+    failedBatches: 0,
+    totalUpdates: 0,
+    averageBatchSize: 0,
+    averageProcessingTime: 0,
+    totalSavedRequests: 0
+  })
+  const [batchQueueStatus, setBatchQueueStatus] = useState({
+    queueSize: 0,
+    isProcessing: false,
+    hasTimer: false,
+    pendingUpdates: []
   })
   
   // Cursor tooltip state
@@ -235,6 +254,24 @@ const CanvasPage: React.FC = () => {
 
     return () => clearInterval(interval)
   }, [])
+
+  // Update batch stats periodically
+  useEffect(() => {
+    const updateBatchStats = () => {
+      const stats = getBatchStats()
+      const queueStatus = getQueueStatus()
+      setBatchStats(stats)
+      setBatchQueueStatus(queueStatus)
+    }
+
+    // Update stats immediately
+    updateBatchStats()
+
+    // Update stats every 2 seconds
+    const interval = setInterval(updateBatchStats, 2000)
+
+    return () => clearInterval(interval)
+  }, [getBatchStats, getQueueStatus])
 
   // Handle tool selection changes for pointer indicators and cursor
   useEffect(() => {
@@ -744,6 +781,17 @@ const CanvasPage: React.FC = () => {
       return
     }
 
+    // Add to batch queue for processing
+    const updateId = addBatchUpdate({
+      objectId,
+      operation: 'resize',
+      data: newProperties,
+      priority: 'normal',
+      maxRetries: 3
+    })
+
+    console.log(`Resize update ${updateId} added to batch queue`)
+
     // Mark object as updating
     setUpdatingObjects(prev => new Set(prev).add(objectId))
     setUpdateProgress(prev => new Map(prev).set(objectId, { method: 'socket', attempt: 1 }))
@@ -878,6 +926,17 @@ const CanvasPage: React.FC = () => {
       toast.info('Update saved offline - will sync when connection is restored', { duration: 3000 })
       return
     }
+
+    // Add to batch queue for processing
+    const updateId = addBatchUpdate({
+      objectId,
+      operation: 'position',
+      data: { x, y },
+      priority: 'high',
+      maxRetries: 3
+    })
+
+    console.log(`Position update ${updateId} added to batch queue`)
 
     // Start loading state
     const canStartLoading = loadingStateManager.startLoading(
@@ -2124,6 +2183,26 @@ const CanvasPage: React.FC = () => {
                   <strong>Queued Debounced Updates:</strong> {debounceStats.queuedUpdates}
                 </div>
                 
+                <div>
+                  <strong>Batch Queue Size:</strong> {batchQueueStatus.queueSize}
+                </div>
+                
+                <div>
+                  <strong>Batch Processing:</strong> {batchQueueStatus.isProcessing ? 'Yes' : 'No'}
+                </div>
+                
+                <div>
+                  <strong>Total Batches:</strong> {batchStats.totalBatches}
+                </div>
+                
+                <div>
+                  <strong>Average Batch Size:</strong> {batchStats.averageBatchSize.toFixed(1)}
+                </div>
+                
+                <div>
+                  <strong>Saved Requests:</strong> {batchStats.totalSavedRequests}
+                </div>
+                
                 {updatingObjects.size > 0 && (
                   <div className="mt-2">
                     <strong>Update Progress:</strong>
@@ -2206,6 +2285,21 @@ const CanvasPage: React.FC = () => {
                     className="bg-indigo-500 text-white px-2 py-1 rounded text-xs hover:bg-indigo-600"
                   >
                     Log Debounce Stats
+                  </button>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const stats = getBatchStats()
+                      const queueStatus = getQueueStatus()
+                      console.log('Batch Statistics:', stats)
+                      console.log('Batch Queue Status:', queueStatus)
+                      toast.success('Batch stats logged to console')
+                    }}
+                    className="bg-teal-500 text-white px-2 py-1 rounded text-xs hover:bg-teal-600"
+                  >
+                    Log Batch Stats
                   </button>
                 </div>
               </div>
