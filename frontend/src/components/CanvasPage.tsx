@@ -17,6 +17,7 @@ import { connectionMonitor } from '../services/connectionMonitor'
 import { offlineManager } from '../services/offlineManager'
 import { objectUpdateDebouncer } from '../utils/debounce'
 import { batchUpdateManager, useBatchUpdates } from '../utils/batchUpdates'
+import { socketEventOptimizer, useSocketOptimization } from '../utils/socketOptimizer'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
@@ -142,6 +143,28 @@ const CanvasPage: React.FC = () => {
     isProcessing: false,
     hasTimer: false,
     pendingUpdates: []
+  })
+  
+  // Socket optimization state
+  const { getStats: getSocketStats, getQueueStatus: getSocketQueueStatus } = useSocketOptimization()
+  const [socketStats, setSocketStats] = useState({
+    totalEventsSent: 0,
+    totalEventsReceived: 0,
+    throttledEvents: 0,
+    compressedEvents: 0,
+    deduplicatedEvents: 0,
+    batchedEvents: 0,
+    averageEventSize: 0,
+    averageProcessingTime: 0,
+    eventsPerSecond: 0,
+    queueSize: 0
+  })
+  const [socketQueueStatus, setSocketQueueStatus] = useState({
+    queueSize: 0,
+    isProcessing: false,
+    hasBatchTimer: false,
+    hasThrottleTimer: false,
+    eventsInLastSecond: 0
   })
   
   // Cursor tooltip state
@@ -272,6 +295,24 @@ const CanvasPage: React.FC = () => {
 
     return () => clearInterval(interval)
   }, [getBatchStats, getQueueStatus])
+
+  // Update socket optimization stats periodically
+  useEffect(() => {
+    const updateSocketStats = () => {
+      const stats = getSocketStats()
+      const queueStatus = getSocketQueueStatus()
+      setSocketStats(stats)
+      setSocketQueueStatus(queueStatus)
+    }
+
+    // Update stats immediately
+    updateSocketStats()
+
+    // Update stats every 2 seconds
+    const interval = setInterval(updateSocketStats, 2000)
+
+    return () => clearInterval(interval)
+  }, [getSocketStats, getSocketQueueStatus])
 
   // Handle tool selection changes for pointer indicators and cursor
   useEffect(() => {
@@ -2203,6 +2244,30 @@ const CanvasPage: React.FC = () => {
                   <strong>Saved Requests:</strong> {batchStats.totalSavedRequests}
                 </div>
                 
+                <div>
+                  <strong>Socket Events Sent:</strong> {socketStats.totalEventsSent}
+                </div>
+                
+                <div>
+                  <strong>Socket Events/Second:</strong> {socketStats.eventsPerSecond.toFixed(1)}
+                </div>
+                
+                <div>
+                  <strong>Throttled Events:</strong> {socketStats.throttledEvents}
+                </div>
+                
+                <div>
+                  <strong>Compressed Events:</strong> {socketStats.compressedEvents}
+                </div>
+                
+                <div>
+                  <strong>Deduplicated Events:</strong> {socketStats.deduplicatedEvents}
+                </div>
+                
+                <div>
+                  <strong>Socket Queue Size:</strong> {socketQueueStatus.queueSize}
+                </div>
+                
                 {updatingObjects.size > 0 && (
                   <div className="mt-2">
                     <strong>Update Progress:</strong>
@@ -2300,6 +2365,21 @@ const CanvasPage: React.FC = () => {
                     className="bg-teal-500 text-white px-2 py-1 rounded text-xs hover:bg-teal-600"
                   >
                     Log Batch Stats
+                  </button>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const stats = getSocketStats()
+                      const queueStatus = getSocketQueueStatus()
+                      console.log('Socket Optimization Statistics:', stats)
+                      console.log('Socket Queue Status:', queueStatus)
+                      toast.success('Socket optimization stats logged to console')
+                    }}
+                    className="bg-cyan-500 text-white px-2 py-1 rounded text-xs hover:bg-cyan-600"
+                  >
+                    Log Socket Stats
                   </button>
                 </div>
               </div>

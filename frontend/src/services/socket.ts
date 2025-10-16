@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import { CursorData } from '../types'
 import { errorLogger, ErrorContext } from '../utils/errorLogger'
+import { socketEventOptimizer } from '../utils/socketOptimizer'
 
 class SocketService {
   private socket: Socket | null = null
@@ -414,6 +415,60 @@ class SocketService {
   // Get error statistics
   getErrorStats() {
     return errorLogger.getErrorStats()
+  }
+
+  // Socket optimization methods
+  optimizeEmit(event: string, data: any, priority: 'low' | 'normal' | 'high' | 'critical' = 'normal') {
+    if (!this.socket) {
+      console.warn('Socket not connected, cannot emit event:', event)
+      return
+    }
+
+    // Use socket optimizer for non-critical events
+    if (priority !== 'critical') {
+      const eventId = socketEventOptimizer.optimizeEvent({
+        type: event,
+        data,
+        priority,
+        maxRetries: 3
+      })
+      
+      if (this.debugMode) {
+        console.log(`Optimized event ${eventId} queued:`, event, data)
+      }
+      return eventId
+    }
+
+    // Emit critical events immediately
+    this.socket.emit(event, data)
+    if (this.debugMode) {
+      console.log(`Critical event emitted immediately:`, event, data)
+    }
+  }
+
+  // Get socket optimization statistics
+  getOptimizationStats() {
+    return socketEventOptimizer.getStats()
+  }
+
+  // Get socket optimization queue status
+  getOptimizationQueueStatus() {
+    return socketEventOptimizer.getQueueStatus()
+  }
+
+  // Flush optimization queue
+  async flushOptimizationQueue() {
+    return socketEventOptimizer.flushQueue()
+  }
+
+  // Clear optimization queue
+  clearOptimizationQueue() {
+    socketEventOptimizer.clearQueue()
+  }
+
+  // Update optimization configuration
+  updateOptimizationConfig(config: any) {
+    socketEventOptimizer.updateConfig(config)
   }
 }
 
