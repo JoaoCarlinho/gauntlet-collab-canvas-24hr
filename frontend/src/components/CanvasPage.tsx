@@ -8,6 +8,7 @@ import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
 import { Canvas, CanvasObject, CursorData } from '../types'
 import { errorLogger } from '../utils/errorLogger'
+import { objectUpdateService } from '../services/objectUpdateService'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -61,6 +62,10 @@ const CanvasPage: React.FC = () => {
   const [failedUpdates, setFailedUpdates] = useState<Map<string, { error: any; timestamp: number; retryCount: number }>>(new Map())
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
   const [showDebugPanel, setShowDebugPanel] = useState(false)
+  
+  // Update progress tracking
+  const [updatingObjects, setUpdatingObjects] = useState<Set<string>>(new Set())
+  const [updateProgress, setUpdateProgress] = useState<Map<string, { method: string; attempt: number }>>(new Map())
   
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
@@ -252,13 +257,13 @@ const CanvasPage: React.FC = () => {
       
       // Show user-friendly error message
       const errorMessage = data.message || 'Failed to update object position'
-      toast.error(`${errorMessage}. Will retry automatically.`, { 
+      toast.error(`${errorMessage}. Fallback mechanism will handle retry.`, { 
         duration: 4000,
         action: {
-          label: 'Retry Now',
+          label: 'View Details',
           onClick: () => {
-            // TODO: Implement immediate retry (Task 1.2)
-            console.log('Manual retry requested for object:', data.object_id)
+            console.log('Object update failed details:', data)
+            toast('Check console for details', { duration: 2000 })
           }
         }
       })
@@ -304,14 +309,167 @@ const CanvasPage: React.FC = () => {
   }
 
   const handleObjectResize = async (objectId: string, newProperties: any) => {
-    if (idToken) {
-      await socketService.updateObject(canvasId!, idToken, objectId, newProperties)
+    if (!idToken || !canvasId) return
+
+    // Mark object as updating
+    setUpdatingObjects(prev => new Set(prev).add(objectId))
+    setUpdateProgress(prev => new Map(prev).set(objectId, { method: 'socket', attempt: 1 }))
+
+    try {
+      const result = await objectUpdateService.updateObjectProperties(
+        canvasId,
+        idToken,
+        objectId,
+        newProperties,
+        {
+          useOptimisticUpdate: true,
+          retryOptions: {
+            maxAttempts: 3,
+            baseDelay: 1000,
+            maxDelay: 4000,
+            backoffMultiplier: 2,
+            jitter: true
+          },
+          onProgress: (attempt, method) => {
+            setUpdateProgress(prev => new Map(prev).set(objectId, { method, attempt }))
+          }
+        }
+      )
+
+      if (result.success) {
+        // Update successful - remove from failed updates if it was there
+        setFailedUpdates(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(objectId)
+          return newMap
+        })
+
+        // Show success message for REST fallback
+        if (result.method === 'rest') {
+          toast.success('Object resized (using backup method)', { duration: 2000 })
+        }
+      } else {
+        // Update failed - track for retry
+        setFailedUpdates(prev => {
+          const newMap = new Map(prev)
+          newMap.set(objectId, {
+            error: result.error,
+            timestamp: Date.now(),
+            retryCount: (prev.get(objectId)?.retryCount || 0) + 1
+          })
+          return newMap
+        })
+
+        // Show error message with retry option
+        toast.error(`Failed to resize object: ${result.error?.message || 'Unknown error'}`, {
+          duration: 5000,
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              // Retry the update
+              handleObjectResize(objectId, newProperties)
+            }
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Unexpected error in handleObjectResize:', error)
+      toast.error('Unexpected error occurred while resizing object')
+    } finally {
+      // Clean up update tracking
+      setUpdatingObjects(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(objectId)
+        return newSet
+      })
+      setUpdateProgress(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(objectId)
+        return newMap
+      })
     }
   }
 
   const handleObjectUpdatePosition = async (objectId: string, x: number, y: number) => {
-    if (idToken) {
-      await socketService.updateObject(canvasId!, idToken, objectId, { x, y })
+    if (!idToken || !canvasId) return
+
+    // Mark object as updating
+    setUpdatingObjects(prev => new Set(prev).add(objectId))
+    setUpdateProgress(prev => new Map(prev).set(objectId, { method: 'socket', attempt: 1 }))
+
+    try {
+      const result = await objectUpdateService.updateObjectPosition(
+        canvasId,
+        idToken,
+        objectId,
+        x,
+        y,
+        {
+          useOptimisticUpdate: true,
+          retryOptions: {
+            maxAttempts: 3,
+            baseDelay: 1000,
+            maxDelay: 4000,
+            backoffMultiplier: 2,
+            jitter: true
+          },
+          onProgress: (attempt, method) => {
+            setUpdateProgress(prev => new Map(prev).set(objectId, { method, attempt }))
+          }
+        }
+      )
+
+      if (result.success) {
+        // Update successful - remove from failed updates if it was there
+        setFailedUpdates(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(objectId)
+          return newMap
+        })
+
+        // Show success message for REST fallback
+        if (result.method === 'rest') {
+          toast.success('Object updated (using backup method)', { duration: 2000 })
+        }
+      } else {
+        // Update failed - track for retry
+        setFailedUpdates(prev => {
+          const newMap = new Map(prev)
+          newMap.set(objectId, {
+            error: result.error,
+            timestamp: Date.now(),
+            retryCount: (prev.get(objectId)?.retryCount || 0) + 1
+          })
+          return newMap
+        })
+
+        // Show error message with retry option
+        toast.error(`Failed to update object position: ${result.error?.message || 'Unknown error'}`, {
+          duration: 5000,
+          action: {
+            label: 'Retry',
+            onClick: () => {
+              // Retry the update
+              handleObjectUpdatePosition(objectId, x, y)
+            }
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Unexpected error in handleObjectUpdatePosition:', error)
+      toast.error('Unexpected error occurred while updating object')
+    } finally {
+      // Clean up update tracking
+      setUpdatingObjects(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(objectId)
+        return newSet
+      })
+      setUpdateProgress(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(objectId)
+        return newMap
+      })
     }
   }
 
@@ -1280,8 +1438,31 @@ const CanvasPage: React.FC = () => {
                 </div>
                 
                 <div>
+                  <strong>Updating Objects:</strong> {updatingObjects.size}
+                </div>
+                
+                <div>
                   <strong>Socket Connected:</strong> {isConnected ? 'Yes' : 'No'}
                 </div>
+                
+                {updatingObjects.size > 0 && (
+                  <div className="mt-2">
+                    <strong>Update Progress:</strong>
+                    <div className="text-xs mt-1">
+                      {Array.from(updatingObjects).map(objectId => {
+                        const progress = updateProgress.get(objectId)
+                        return (
+                          <div key={objectId} className="flex justify-between">
+                            <span>{objectId.slice(0, 8)}...</span>
+                            <span className="text-blue-600">
+                              {progress?.method} (attempt {progress?.attempt})
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 
                 <div className="mt-3">
                   <button
