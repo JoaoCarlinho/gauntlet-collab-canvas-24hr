@@ -10,8 +10,16 @@ import { Canvas, CanvasObject, CursorData } from '../types'
 import { errorLogger } from '../utils/errorLogger'
 import { objectUpdateService } from '../services/objectUpdateService'
 import { optimisticUpdateManager } from '../services/optimisticUpdateManager'
+import { loadingStateManager } from '../services/loadingStateManager'
+import { stateSyncManager, StateConflict } from '../services/stateSyncManager'
+import { updateQueueManager, QueueStats } from '../services/updateQueueManager'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
+import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
+import ConflictResolutionDialog from './ConflictResolutionDialog'
+import SyncStatusIndicator from './SyncStatusIndicator'
+import QueueStatusIndicator from './QueueStatusIndicator'
+import QueueManagementDialog from './QueueManagementDialog'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -74,6 +82,22 @@ const CanvasPage: React.FC = () => {
   const [optimisticObjects, setOptimisticObjects] = useState<Set<string>>(new Set())
   const [successAnimations, setSuccessAnimations] = useState<Array<{ id: string; x: number; y: number }>>([])
   
+  // State synchronization and conflict management
+  const [stateConflicts, setStateConflicts] = useState<StateConflict[]>([])
+  const [showConflictDialog, setShowConflictDialog] = useState(false)
+  const [syncStatus, setSyncStatus] = useState({
+    isConnected: true,
+    lastSyncTime: 0,
+    syncInProgress: false,
+    hasConflicts: false,
+    conflictCount: 0,
+    autoSyncActive: false
+  })
+  
+  // Update queue management
+  const [queueStats, setQueueStats] = useState<QueueStats>(updateQueueManager.getStats())
+  const [showQueueDialog, setShowQueueDialog] = useState(false)
+  
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -115,11 +139,21 @@ const CanvasPage: React.FC = () => {
     // Set up socket event listeners
     setupSocketListeners()
 
+    // Initialize state synchronization
+    initializeStateSync()
+
+    // Initialize update queue
+    initializeUpdateQueue()
+
     return () => {
       if (idToken) {
         socketService.leaveCanvas(canvasId!, idToken)
         socketService.userOffline(canvasId!, idToken)
       }
+      // Clean up state sync
+      stateSyncManager.stopAutoSync()
+      // Clean up update queue
+      updateQueueManager.stopAutoProcessing()
     }
   }, [isAuthenticated, canvasId, isConnected])
 
@@ -142,6 +176,11 @@ const CanvasPage: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isDrawing, editingObjectId, selectedObjectId])
+
+  // Monitor connection status changes for queue manager
+  useEffect(() => {
+    updateQueueManager.setConnectionStatus(isConnected)
+  }, [isConnected])
 
   // Handle tool selection changes for pointer indicators and cursor
   useEffect(() => {
@@ -293,6 +332,152 @@ const CanvasPage: React.FC = () => {
     // Online users are now handled by PresenceIndicators component
   }
 
+  // State synchronization functions
+  const initializeStateSync = () => {
+    // Set up conflict callback
+    stateSyncManager.onConflict((conflicts) => {
+      setStateConflicts(conflicts)
+      setSyncStatus(prev => ({
+        ...prev,
+        hasConflicts: conflicts.length > 0,
+        conflictCount: conflicts.length
+      }))
+      
+      if (conflicts.length > 0) {
+        toast.error(`${conflicts.length} state conflicts detected`, {
+          duration: 5000,
+          action: {
+            label: 'Resolve',
+            onClick: () => setShowConflictDialog(true)
+          }
+        })
+      }
+    })
+
+    // Start auto sync every 30 seconds
+    stateSyncManager.startAutoSync(30000)
+    
+    // Update sync status
+    updateSyncStatus()
+  }
+
+  const updateSyncStatus = () => {
+    const stats = stateSyncManager.getSyncStats()
+    setSyncStatus(prev => ({
+      ...prev,
+      isConnected: isConnected,
+      lastSyncTime: stats.lastSyncTime,
+      syncInProgress: stats.syncInProgress,
+      autoSyncActive: stats.autoSyncActive
+    }))
+  }
+
+  const handleManualSync = async () => {
+    if (!canvasId) return
+    
+    setSyncStatus(prev => ({ ...prev, syncInProgress: true }))
+    
+    try {
+      const result = await stateSyncManager.syncState(canvasId, objects, {
+        forceRefresh: true,
+        resolveConflicts: true,
+        conflictResolutionStrategy: 'server_wins'
+      })
+      
+      if (result.success) {
+        if (result.conflicts.length > 0) {
+          setStateConflicts(result.conflicts)
+          setShowConflictDialog(true)
+        } else {
+          toast.success('State synchronized successfully')
+        }
+      } else {
+        toast.error('Sync failed: ' + result.errors.join(', '))
+      }
+    } catch (error) {
+      console.error('Manual sync failed:', error)
+      toast.error('Failed to synchronize state')
+    } finally {
+      updateSyncStatus()
+    }
+  }
+
+  const handleConflictResolution = async (resolutions: any[]) => {
+    try {
+      // Apply resolutions to local state
+      for (const resolution of resolutions) {
+        if (resolution.resolution === 'server_wins') {
+          // Update local object with server version
+          const conflict = stateConflicts.find(c => c.objectId === resolution.conflictId)
+          if (conflict) {
+            setObjects(prev => prev.map(obj => 
+              obj.id === conflict.objectId ? conflict.serverObject : obj
+            ))
+          }
+        } else if (resolution.resolution === 'client_wins') {
+          // Keep local version (no change needed)
+          continue
+        } else if (resolution.resolution === 'merge') {
+          // Apply merged object
+          const conflict = stateConflicts.find(c => c.objectId === resolution.conflictId)
+          if (conflict && resolution.resolvedObject) {
+            setObjects(prev => prev.map(obj => 
+              obj.id === conflict.objectId ? resolution.resolvedObject : obj
+            ))
+          }
+        }
+        // Skip resolution means no change
+      }
+      
+      // Clear conflicts
+      setStateConflicts([])
+      setSyncStatus(prev => ({
+        ...prev,
+        hasConflicts: false,
+        conflictCount: 0
+      }))
+      
+      toast.success('Conflicts resolved successfully')
+    } catch (error) {
+      console.error('Conflict resolution failed:', error)
+      toast.error('Failed to resolve conflicts')
+    }
+  }
+
+  // Update queue management functions
+  const initializeUpdateQueue = () => {
+    // Set up queue stats callback
+    updateQueueManager.onStatsChange((stats) => {
+      setQueueStats(stats)
+    })
+
+    // Set connection status for queue manager
+    updateQueueManager.setConnectionStatus(isConnected)
+
+    // Start auto processing
+    updateQueueManager.startAutoProcessing()
+  }
+
+  const handleQueueAction = (action: string) => {
+    switch (action) {
+      case 'retry_failed':
+        const failedUpdates = updateQueueManager.getFailedUpdates()
+        failedUpdates.forEach(update => {
+          updateQueueManager.retryFailedUpdate(update.id)
+        })
+        toast.success(`Retrying ${failedUpdates.length} failed updates`)
+        break
+      case 'clear_completed':
+        updateQueueManager.clearCompleted()
+        toast.success('Cleared completed updates')
+        break
+      case 'clear_failed':
+        updateQueueManager.clearFailed()
+        toast.success('Cleared failed updates')
+        break
+    }
+  }
+
   // New handler functions for enhanced interactions
   const handleObjectSelect = (objectId: string) => {
     if (selectedTool.id === 'select') {
@@ -404,6 +589,19 @@ const CanvasPage: React.FC = () => {
     const currentObject = objects.find(obj => obj.id === objectId)
     if (!currentObject) return
 
+    // Start loading state
+    const canStartLoading = loadingStateManager.startLoading(
+      objectId,
+      'position',
+      'socket',
+      { preventMultiple: true, maxConcurrent: 3 }
+    )
+
+    if (!canStartLoading) {
+      toast.warning('Object is already being updated, please wait...', { duration: 2000 })
+      return
+    }
+
     // Start optimistic update - immediately update local state
     const optimisticState = optimisticUpdateManager.startOptimisticUpdate(
       objectId,
@@ -435,11 +633,15 @@ const CanvasPage: React.FC = () => {
           },
           onProgress: (attempt, method) => {
             setUpdateProgress(prev => new Map(prev).set(objectId, { method, attempt }))
+            loadingStateManager.updateProgress(objectId, (attempt / 3) * 100, method, attempt)
           }
         }
       )
 
       if (result.success) {
+        // Stop loading state
+        loadingStateManager.stopLoading(objectId, 'success')
+        
         // Confirm optimistic update
         optimisticUpdateManager.confirmOptimisticUpdate(objectId, result.object!)
         
@@ -462,6 +664,9 @@ const CanvasPage: React.FC = () => {
           toast.success('Object updated (using backup method)', { duration: 2000 })
         }
       } else {
+        // Stop loading state
+        loadingStateManager.stopLoading(objectId, 'error')
+        
         // Rollback optimistic update
         const originalState = optimisticUpdateManager.rollbackOptimisticUpdate(objectId)
         
@@ -471,6 +676,22 @@ const CanvasPage: React.FC = () => {
             obj.id === objectId ? originalState : obj
           ))
         }
+
+        // Queue the failed update for retry
+        const queueId = updateQueueManager.enqueue({
+          canvasId,
+          idToken,
+          objectId,
+          operation: 'position',
+          data: { x, y },
+          priority: 'high',
+          maxRetries: 3,
+          metadata: {
+            userAction: 'position_update',
+            source: 'user',
+            originalTimestamp: Date.now()
+          }
+        })
 
         // Track for retry
         setFailedUpdates(prev => {
@@ -483,20 +704,20 @@ const CanvasPage: React.FC = () => {
           return newMap
         })
 
-        // Show error message with retry option
-        toast.error(`Failed to update object position: ${result.error?.message || 'Unknown error'}`, {
+        // Show error message with queue info
+        toast.error(`Failed to update object position. Queued for retry (ID: ${queueId.slice(0, 8)}...)`, {
           duration: 5000,
           action: {
-            label: 'Retry',
-            onClick: () => {
-              // Retry the update
-              handleObjectUpdatePosition(objectId, x, y)
-            }
+            label: 'View Queue',
+            onClick: () => setShowQueueDialog(true)
           }
         })
       }
     } catch (error) {
       console.error('Unexpected error in handleObjectUpdatePosition:', error)
+      
+      // Stop loading state
+      loadingStateManager.stopLoading(objectId, 'error')
       
       // Rollback optimistic update
       const originalState = optimisticUpdateManager.rollbackOptimisticUpdate(objectId)
@@ -506,7 +727,29 @@ const CanvasPage: React.FC = () => {
         ))
       }
       
-      toast.error('Unexpected error occurred while updating object')
+      // Queue the unexpected error for retry
+      const queueId = updateQueueManager.enqueue({
+        canvasId,
+        idToken,
+        objectId,
+        operation: 'position',
+        data: { x, y },
+        priority: 'high',
+        maxRetries: 3,
+        metadata: {
+          userAction: 'position_update',
+          source: 'user',
+          originalTimestamp: Date.now()
+        }
+      })
+      
+      toast.error(`Unexpected error occurred. Queued for retry (ID: ${queueId.slice(0, 8)}...)`, {
+        duration: 5000,
+        action: {
+          label: 'View Queue',
+          onClick: () => setShowQueueDialog(true)
+        }
+      })
     } finally {
       // Clean up update tracking
       setOptimisticObjects(prev => {
@@ -812,6 +1055,7 @@ const CanvasPage: React.FC = () => {
     const isOptimistic = optimisticObjects.has(obj.id)
     const isUpdating = updatingObjects.has(obj.id)
     const progress = updateProgress.get(obj.id)
+    const loadingState = loadingStateManager.getLoadingState(obj.id)
 
     switch (obj.object_type) {
       case 'rectangle':
@@ -844,14 +1088,16 @@ const CanvasPage: React.FC = () => {
               onCursorReset={handleCursorReset}
             />
             
-            {/* Optimistic update indicator */}
-            <OptimisticUpdateIndicator
-              object={displayObject}
-              isUpdating={isUpdating}
-              updateMethod={progress?.method as 'socket' | 'rest'}
-              attempt={progress?.attempt}
-              showProgress={true}
-            />
+            {/* Enhanced loading indicator */}
+            {loadingState && (
+              <EnhancedLoadingIndicator
+                object={displayObject}
+                loadingState={loadingState}
+                showProgress={true}
+                showMethod={true}
+                showAttempt={true}
+              />
+            )}
           </Group>
         )
       case 'circle':
@@ -1337,11 +1583,29 @@ const CanvasPage: React.FC = () => {
             maxVisible={3}
           />
           
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-            <span className="text-sm text-gray-600">
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-sm text-gray-600">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            
+            {/* Sync Status Indicator */}
+            <SyncStatusIndicator
+              status={syncStatus}
+              onManualSync={handleManualSync}
+              onShowConflicts={() => setShowConflictDialog(true)}
+            />
+            
+            {/* Queue Status Indicator */}
+            <QueueStatusIndicator
+              stats={queueStats}
+              onShowQueue={() => setShowQueueDialog(true)}
+              onRetryFailed={() => handleQueueAction('retry_failed')}
+              onClearCompleted={() => handleQueueAction('clear_completed')}
+              onClearFailed={() => handleQueueAction('clear_failed')}
+            />
           </div>
           
           {/* User Status */}
@@ -1533,6 +1797,14 @@ const CanvasPage: React.FC = () => {
                 </div>
                 
                 <div>
+                  <strong>Active Loading States:</strong> {loadingStateManager.getActiveLoadingCount()}
+                </div>
+                
+                <div>
+                  <strong>Queued Updates:</strong> {loadingStateManager.getQueuedUpdates().length}
+                </div>
+                
+                <div>
                   <strong>Socket Connected:</strong> {isConnected ? 'Yes' : 'No'}
                 </div>
                 
@@ -1593,11 +1865,38 @@ const CanvasPage: React.FC = () => {
                     Log Optimistic Stats
                   </button>
                 </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const stats = loadingStateManager.getLoadingStats()
+                      console.log('Loading State Statistics:', stats)
+                      toast.success('Loading state stats logged to console')
+                    }}
+                    className="bg-orange-500 text-white px-2 py-1 rounded text-xs hover:bg-orange-600"
+                  >
+                    Log Loading Stats
+                  </button>
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
+
+      {/* Conflict Resolution Dialog */}
+      <ConflictResolutionDialog
+        isOpen={showConflictDialog}
+        conflicts={stateConflicts}
+        onClose={() => setShowConflictDialog(false)}
+        onResolve={handleConflictResolution}
+      />
+
+      {/* Queue Management Dialog */}
+      <QueueManagementDialog
+        isOpen={showQueueDialog}
+        onClose={() => setShowQueueDialog(false)}
+      />
     </div>
   )
 }
