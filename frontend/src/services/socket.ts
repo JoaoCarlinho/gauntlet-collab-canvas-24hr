@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client'
 import { CursorData } from '../types'
+import { errorLogger, ErrorContext } from '../utils/errorLogger'
 
 class SocketService {
   private socket: Socket | null = null
@@ -49,11 +50,37 @@ class SocketService {
       console.error('=== Socket.IO Connection Error ===')
       console.error('Error:', error)
       console.error('Error message:', error.message)
+      
+      const context: ErrorContext = {
+        operation: 'socket_connection',
+        timestamp: Date.now(),
+        additionalData: { 
+          type: 'connection_error', 
+          socketId: this.socket?.id,
+          errorMessage: error.message
+        }
+      }
+      
+      const errorId = errorLogger.logError(error, context)
+      this.emit('socket_error', { error, timestamp: Date.now(), type: 'connection_error', errorId })
     })
 
     this.socket.on('error', (error) => {
       console.error('=== Socket.IO Error ===')
       console.error('Error:', error)
+      
+      const context: ErrorContext = {
+        operation: 'general',
+        timestamp: Date.now(),
+        additionalData: { 
+          type: 'general_error', 
+          socketId: this.socket?.id
+        }
+      }
+      
+      const errorId = errorLogger.logError(error, context)
+      // Emit error event for components to handle
+      this.emit('socket_error', { error, timestamp: Date.now(), type: 'general_error', errorId })
     })
 
     // Register event listeners
@@ -119,6 +146,61 @@ class SocketService {
 
     this.socket.on('online_users', (data) => {
       this.emit('online_users', data)
+    })
+
+    // Error events for object operations
+    this.socket.on('object_update_failed', (data) => {
+      console.error('=== Object Update Failed ===')
+      console.error('Data:', data)
+      
+      const context: ErrorContext = {
+        operation: 'object_update',
+        objectId: data.object_id,
+        timestamp: Date.now(),
+        additionalData: { 
+          type: 'object_update_failed',
+          errorData: data
+        }
+      }
+      
+      const errorId = errorLogger.logError(data.error || data, context)
+      this.emit('object_update_failed', { ...data, errorId })
+    })
+
+    this.socket.on('object_create_failed', (data) => {
+      console.error('=== Object Create Failed ===')
+      console.error('Data:', data)
+      
+      const context: ErrorContext = {
+        operation: 'object_create',
+        objectType: data.object_type,
+        timestamp: Date.now(),
+        additionalData: { 
+          type: 'object_create_failed',
+          errorData: data
+        }
+      }
+      
+      const errorId = errorLogger.logError(data.error || data, context)
+      this.emit('object_create_failed', { ...data, errorId })
+    })
+
+    this.socket.on('object_delete_failed', (data) => {
+      console.error('=== Object Delete Failed ===')
+      console.error('Data:', data)
+      
+      const context: ErrorContext = {
+        operation: 'object_delete',
+        objectId: data.object_id,
+        timestamp: Date.now(),
+        additionalData: { 
+          type: 'object_delete_failed',
+          errorData: data
+        }
+      }
+      
+      const errorId = errorLogger.logError(data.error || data, context)
+      this.emit('object_delete_failed', { ...data, errorId })
     })
   }
 
@@ -262,6 +344,21 @@ class SocketService {
 
   isConnected(): boolean {
     return this.socket?.connected || false
+  }
+
+  // Get error log for debugging (delegates to errorLogger)
+  getErrorLog() {
+    return errorLogger.getErrorLog()
+  }
+
+  // Clear error log (delegates to errorLogger)
+  clearErrorLog() {
+    errorLogger.clearLog()
+  }
+
+  // Get error statistics
+  getErrorStats() {
+    return errorLogger.getErrorStats()
   }
 }
 

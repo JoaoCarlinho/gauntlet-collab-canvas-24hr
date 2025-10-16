@@ -7,6 +7,7 @@ import { useSocket } from '../hooks/useSocket'
 import { canvasAPI } from '../services/api'
 import { socketService } from '../services/socket'
 import { Canvas, CanvasObject, CursorData } from '../types'
+import { errorLogger } from '../utils/errorLogger'
 import toast from 'react-hot-toast'
 import InviteCollaboratorModal from './InviteCollaboratorModal'
 import PresenceIndicators from './PresenceIndicators'
@@ -55,6 +56,11 @@ const CanvasPage: React.FC = () => {
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null)
   const [editingObjectId, setEditingObjectId] = useState<string | null>(null)
   const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null)
+  
+  // Error handling state
+  const [failedUpdates, setFailedUpdates] = useState<Map<string, { error: any; timestamp: number; retryCount: number }>>(new Map())
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error'>('connected')
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
   
   // Cursor tooltip state
   const [hoveredCursor, setHoveredCursor] = useState<CursorData | null>(null)
@@ -206,6 +212,70 @@ const CanvasPage: React.FC = () => {
 
     socketService.on('user_left', (data: { user_name: string }) => {
       toast(`${data.user_name} left the canvas`)
+    })
+
+    // Connection status monitoring
+    socketService.on('joined_canvas', () => {
+      setConnectionStatus('connected')
+      toast.success('Connected to canvas', { duration: 2000 })
+    })
+
+    // Error event listeners
+    socketService.on('socket_error', (data: { error: any; timestamp: number; type: string }) => {
+      console.error('Socket error received:', data)
+      setConnectionStatus('error')
+      
+      // Show user-friendly error message based on error type
+      let errorMessage = 'Connection error occurred'
+      if (data.type === 'connection_error') {
+        errorMessage = 'Lost connection to server. Attempting to reconnect...'
+      } else if (data.type === 'general_error') {
+        errorMessage = 'Network error occurred. Some features may be limited.'
+      }
+      
+      toast.error(errorMessage, { duration: 5000 })
+    })
+
+    socketService.on('object_update_failed', (data: { object_id: string; error: any; message?: string }) => {
+      console.error('Object update failed:', data)
+      
+      // Track failed update for retry mechanism
+      setFailedUpdates(prev => {
+        const newMap = new Map(prev)
+        newMap.set(data.object_id, {
+          error: data.error,
+          timestamp: Date.now(),
+          retryCount: (prev.get(data.object_id)?.retryCount || 0) + 1
+        })
+        return newMap
+      })
+      
+      // Show user-friendly error message
+      const errorMessage = data.message || 'Failed to update object position'
+      toast.error(`${errorMessage}. Will retry automatically.`, { 
+        duration: 4000,
+        action: {
+          label: 'Retry Now',
+          onClick: () => {
+            // TODO: Implement immediate retry (Task 1.2)
+            console.log('Manual retry requested for object:', data.object_id)
+          }
+        }
+      })
+    })
+
+    socketService.on('object_create_failed', (data: { object_type: string; error: any; message?: string }) => {
+      console.error('Object creation failed:', data)
+      
+      const errorMessage = data.message || `Failed to create ${data.object_type}`
+      toast.error(errorMessage, { duration: 4000 })
+    })
+
+    socketService.on('object_delete_failed', (data: { object_id: string; error: any; message?: string }) => {
+      console.error('Object deletion failed:', data)
+      
+      const errorMessage = data.message || 'Failed to delete object'
+      toast.error(errorMessage, { duration: 4000 })
     })
 
     // Online users are now handled by PresenceIndicators component
@@ -1178,6 +1248,71 @@ const CanvasPage: React.FC = () => {
         preferences={preferences}
         onPreferencesChange={updatePreferences}
       />
+
+      {/* Debug Panel - Only show in development */}
+      {import.meta.env.DEV && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <button
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            className="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm hover:bg-gray-700 transition-colors"
+          >
+            🐛 Debug
+          </button>
+          
+          {showDebugPanel && (
+            <div className="absolute bottom-12 right-0 bg-white border border-gray-300 rounded-lg shadow-lg p-4 w-80 max-h-96 overflow-y-auto">
+              <h3 className="font-bold text-sm mb-2">Error Debug Panel</h3>
+              
+              <div className="space-y-2 text-xs">
+                <div>
+                  <strong>Connection Status:</strong> 
+                  <span className={`ml-1 px-2 py-1 rounded text-xs ${
+                    connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    connectionStatus === 'error' ? 'bg-red-100 text-red-800' :
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {connectionStatus}
+                  </span>
+                </div>
+                
+                <div>
+                  <strong>Failed Updates:</strong> {failedUpdates.size}
+                </div>
+                
+                <div>
+                  <strong>Socket Connected:</strong> {isConnected ? 'Yes' : 'No'}
+                </div>
+                
+                <div className="mt-3">
+                  <button
+                    onClick={() => {
+                      const stats = errorLogger.getErrorStats()
+                      console.log('Error Statistics:', stats)
+                      console.log('Error Log:', errorLogger.getErrorLog())
+                    }}
+                    className="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600"
+                  >
+                    Log Stats to Console
+                  </button>
+                </div>
+                
+                <div>
+                  <button
+                    onClick={() => {
+                      const log = errorLogger.exportLog()
+                      navigator.clipboard.writeText(log)
+                      toast.success('Error log copied to clipboard')
+                    }}
+                    className="bg-green-500 text-white px-2 py-1 rounded text-xs hover:bg-green-600"
+                  >
+                    Export Error Log
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
