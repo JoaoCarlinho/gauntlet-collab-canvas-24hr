@@ -136,12 +136,12 @@ export function debounce<T extends (...args: any[]) => any>(
     return timeoutId !== null
   }
 
-  function debounced(...args: Parameters<T>) {
+  function debounced(this: any, ...args: Parameters<T>) {
     const time = Date.now()
     const isInvoking = shouldInvoke(time)
 
     lastArgs = args
-    lastThis = this
+    lastThis = this as any
     lastCallTime = time
 
     if (isInvoking) {

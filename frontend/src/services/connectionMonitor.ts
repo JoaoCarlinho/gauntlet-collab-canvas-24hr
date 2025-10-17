@@ -73,7 +73,7 @@ class ConnectionMonitor extends SimpleEventEmitter {
   private pingInterval: NodeJS.Timeout | null = null
   private qualityCheckInterval: NodeJS.Timeout | null = null
   private reconnectTimeout: NodeJS.Timeout | null = null
-  private startTime = Date.now()
+  // private startTime = Date.now()
   private latencyHistory: number[] = []
   private maxLatencyHistory = 50
 

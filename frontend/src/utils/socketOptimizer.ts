@@ -260,7 +260,7 @@ class SocketEventOptimizer {
       groups.get(key)!.push(event)
     }
     
-    return Array.from(groups.entries()).map(([key, events]) => ({
+    return Array.from(groups.entries()).map(([_key, events]) => ({
       events,
       timestamp: Date.now(),
       priority: events[0].priority,
@@ -319,9 +319,8 @@ class SocketEventOptimizer {
     
     try {
       // Compress if needed
-      let processedData = batch.events
       if (batch.compressed) {
-        processedData = this.compressEvents(batch.events)
+        this.compressEvents(batch.events)
         this.stats.compressedEvents++
       }
       

@@ -88,7 +88,7 @@ class LoadingStateManager {
   /**
    * Stop loading state for an object
    */
-  stopLoading(objectId: string, reason: 'success' | 'error' | 'timeout' | 'cancelled' = 'success'): LoadingState | null {
+  stopLoading(objectId: string, _reason: 'success' | 'error' | 'timeout' | 'cancelled' = 'success'): LoadingState | null {
     const state = this.loadingStates.get(objectId)
     if (!state) return null
 

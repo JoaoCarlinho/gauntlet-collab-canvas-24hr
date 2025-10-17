@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { X, Clock, CheckCircle, XCircle, AlertTriangle, RotateCcw, Trash2, Play, Pause } from 'lucide-react'
+import { X, Clock, CheckCircle, XCircle, AlertTriangle, RotateCcw, Trash2 } from 'lucide-react'
+// import { Play, Pause } from 'lucide-react';
 import { updateQueueManager, QueuedUpdate, QueueStats } from '../services/updateQueueManager'
 
 interface QueueManagementDialogProps {

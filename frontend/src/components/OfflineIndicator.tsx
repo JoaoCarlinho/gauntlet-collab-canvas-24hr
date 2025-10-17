@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { WifiOff, Wifi, RefreshCw, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { WifiOff, Wifi, RefreshCw, AlertTriangle } from 'lucide-react'
+// import { CheckCircle, Clock } from 'lucide-react';
 import { offlineManager, OfflineState } from '../services/offlineManager'
 
 interface OfflineIndicatorProps {
@@ -105,7 +106,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
   }
 
   const handleForceRefreshCw = () => {
-    offlineManager.forceRefreshCw()
+        offlineManager.forceSync()
   }
 
   const handleClearOfflineData = () => {
@@ -246,16 +247,16 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
                   <span className="font-medium">{formatDuration(state.totalOfflineTime)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>RefreshCw Operations:</span>
-                  <span className="font-medium">{state.totalRefreshCwOperations}</span>
+                  <span>Sync Operations:</span>
+                  <span className="font-medium">{state.totalSyncOperations}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Successful RefreshCws:</span>
-                  <span className="font-medium text-green-600">{state.successfulRefreshCws}</span>
+                  <span>Successful Syncs:</span>
+                  <span className="font-medium text-green-600">{state.successfulSyncs}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Failed RefreshCws:</span>
-                  <span className="font-medium text-red-600">{state.failedRefreshCws}</span>
+                  <span>Failed Syncs:</span>
+                  <span className="font-medium text-red-600">{state.failedSyncs}</span>
                 </div>
               </div>
             </div>
@@ -269,7 +270,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
                   className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
                 >
                   <RefreshCw className="h-3 w-3" />
-                  <span>Force RefreshCw</span>
+                  <span>Force Sync</span>
                 </button>
               )}
               

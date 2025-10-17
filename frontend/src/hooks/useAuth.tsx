@@ -53,9 +53,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser({
           id: 'dev-user',
           email: 'dev@example.com',
-          displayName: 'Development User',
           permissions: ['read', 'write', 'admin']
-        })
+        } as any)
         setIsAuthenticated(true)
         setIsLoading(false)
         return

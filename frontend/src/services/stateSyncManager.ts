@@ -33,7 +33,7 @@ export interface SyncOptions {
 class StateSyncManager {
   private lastSyncTime = 0
   private syncInProgress = false
-  private conflictResolutionStrategy: SyncOptions['conflictResolutionStrategy'] = 'server_wins'
+  // private conflictResolutionStrategy: SyncOptions['conflictResolutionStrategy'] = 'server_wins'
   private syncInterval: NodeJS.Timeout | null = null
   private conflictCallbacks: Array<(conflicts: StateConflict[]) => void> = []
 
@@ -47,7 +47,7 @@ class StateSyncManager {
 
     this.syncInterval = setInterval(async () => {
       try {
-        await this.syncState()
+        await this.syncState('', [])
       } catch (error) {
         console.error('Auto sync failed:', error)
       }
@@ -117,7 +117,7 @@ class StateSyncManager {
       const errorMessage = error instanceof Error ? error.message : 'Unknown sync error'
       
       errorLogger.logError(error, {
-        operation: 'state_sync',
+        operation: 'general',
         timestamp: Date.now(),
         additionalData: {
           canvasId,
@@ -347,8 +347,8 @@ class StateSyncManager {
   /**
    * Set conflict resolution strategy
    */
-  setConflictResolutionStrategy(strategy: SyncOptions['conflictResolutionStrategy']): void {
-    this.conflictResolutionStrategy = strategy
+  setConflictResolutionStrategy(_strategy: SyncOptions['conflictResolutionStrategy']): void {
+    // this.conflictResolutionStrategy = strategy
   }
 
   /**

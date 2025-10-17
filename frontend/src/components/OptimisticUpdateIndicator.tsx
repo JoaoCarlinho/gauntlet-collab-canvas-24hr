@@ -3,7 +3,8 @@
  */
 
 import React from 'react'
-import { Group, Circle, Rect, Text } from 'react-konva'
+import { Group, Circle, Text } from 'react-konva'
+// import { Rect } from 'react-konva';
 import { CanvasObject } from '../types'
 
 interface OptimisticUpdateIndicatorProps {
@@ -27,7 +28,7 @@ const OptimisticUpdateIndicator: React.FC<OptimisticUpdateIndicatorProps> = ({
   const x = props.x || 0
   const y = props.y || 0
   const width = props.width || 100
-  const height = props.height || 100
+  // const height = props.height || 100
 
   // Calculate indicator position (top-right corner of object)
   const indicatorX = x + width - 20

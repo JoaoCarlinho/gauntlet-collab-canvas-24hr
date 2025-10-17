@@ -2,8 +2,10 @@
  * Queue Status Indicator for showing update queue status
  */
 
-import React, { useState, useEffect } from 'react'
-import { Clock, AlertTriangle, CheckCircle, XCircle, Pause, Play, RotateCcw } from 'lucide-react'
+import React, { useState } from 'react'
+import { Clock, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
+// import { useEffect } from 'react';
+// import { AlertTriangle, Pause, Play } from 'lucide-react';
 import { QueueStats } from '../services/updateQueueManager'
 
 interface QueueStatusIndicatorProps {

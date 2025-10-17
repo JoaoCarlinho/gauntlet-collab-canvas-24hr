@@ -4,7 +4,8 @@
 
 import { socketService } from './socket'
 import { objectsAPI } from './api'
-import { retryWithBackoff, isRetryableError, RETRY_PRESETS } from '../utils/retryLogic'
+import { retryWithBackoff, RETRY_PRESETS } from '../utils/retryLogic'
+// import { isRetryableError } from '../utils/retryLogic';
 import { errorLogger } from '../utils/errorLogger'
 import { CanvasObject } from '../types'
 
@@ -226,8 +227,8 @@ class ObjectUpdateService {
    * Try REST API update with retry logic
    */
   private async tryRestUpdate(
-    canvasId: string,
-    idToken: string,
+    _canvasId: string,
+    _idToken: string,
     objectId: string,
     properties: Record<string, any>,
     retryOptions: any,

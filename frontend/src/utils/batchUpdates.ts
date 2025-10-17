@@ -72,7 +72,7 @@ class BatchUpdateManager {
   addUpdate(update: Omit<BatchUpdate, 'id' | 'timestamp' | 'retryCount'>): string {
     if (!this.config.enableBatching) {
       // If batching is disabled, process immediately
-      this.processSingleUpdate(update)
+      this.processSingleUpdate(update as any)
       return `immediate_${Date.now()}`
     }
 
@@ -84,7 +84,7 @@ class BatchUpdateManager {
       timestamp: Date.now(),
       retryCount: 0,
       maxRetries: update.maxRetries || 3
-    }
+    } as BatchUpdate
 
     // Check if we should process immediately based on priority
     if (this.shouldProcessImmediately(batchUpdate)) {
@@ -254,7 +254,7 @@ class BatchUpdateManager {
   /**
    * Execute a batch of updates for a specific operation
    */
-  private async executeOperationBatch(operation: string, updates: BatchUpdate[]): Promise<{
+  private async executeOperationBatch(_operation: string, updates: BatchUpdate[]): Promise<{
     processed: BatchUpdate[]
     failed: BatchUpdate[]
     errors: string[]

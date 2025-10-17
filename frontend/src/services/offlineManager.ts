@@ -70,7 +70,7 @@ class OfflineManager extends SimpleEventEmitter {
   private syncQueue: OfflineUpdate[] = []
   private maxOfflineUpdates = 1000
   private syncBatchSize = 50
-  private syncTimeout = 30000 // 30 seconds
+  // private syncTimeout = 30000 // 30 seconds
 
   constructor() {
     super()
@@ -395,7 +395,7 @@ class OfflineManager extends SimpleEventEmitter {
       
     } catch (error) {
       errorLogger.logError(error, {
-        operation: 'offline_sync',
+        operation: 'general',
         objectId: update.objectId,
         timestamp: Date.now(),
         additionalData: {
@@ -428,7 +428,7 @@ class OfflineManager extends SimpleEventEmitter {
   /**
    * Handle sync errors
    */
-  private handleSyncErrors(failedUpdates: OfflineUpdate[], errors: string[]): void {
+  private handleSyncErrors(failedUpdates: OfflineUpdate[], _errors: string[]): void {
     // Retry failed updates if they haven't exceeded max retries
     for (const update of failedUpdates) {
       if (update.retryCount < update.maxRetries) {
@@ -589,10 +589,11 @@ class OfflineManager extends SimpleEventEmitter {
     this.emit('offlineStatusChange', true)
     
     // Log the event
-    errorLogger.log('Connection lost - entering offline mode', {
-      context: 'offline_manager',
-      level: 'info',
-      metadata: {
+    errorLogger.logError(new Error('Connection lost - entering offline mode'), {
+      operation: 'general',
+      objectId: 'offline_manager',
+      timestamp: Date.now(),
+      additionalData: {
         pendingUpdates: this.state.pendingUpdates.length,
         cachedObjects: this.state.cachedObjects.size,
         totalOfflineTime: this.state.totalOfflineTime

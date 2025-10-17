@@ -3,7 +3,7 @@
  */
 
 import toast from 'react-hot-toast'
-import { isTestingMode } from './devMode'
+// import { isTestingMode } from './devMode'
 
 // Store original toast methods
 const originalToast = {

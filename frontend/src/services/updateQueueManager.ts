@@ -3,10 +3,11 @@
  */
 
 import { v4 as uuidv4 } from 'uuid'
-import { CanvasObject } from '../types'
+// import { CanvasObject } from '../types'
 import { objectUpdateService } from './objectUpdateService'
 import { errorLogger } from '../utils/errorLogger'
-import { withRetry, RetryOptions, RETRY_PRESETS } from '../utils/retryLogic'
+import { RetryOptions, RETRY_PRESETS } from '../utils/retryLogic'
+// import { withRetry } from '../utils/retryLogic';
 
 export interface QueuedUpdate {
   id: string
@@ -233,7 +234,7 @@ class UpdateQueueManager {
         // Max retries reached, move to failed
         this.failed.set(update.id, update)
         errorLogger.logError(error, {
-          operation: 'update_queue_failed',
+          operation: 'general',
           objectId: update.objectId,
           timestamp: Date.now(),
           additionalData: {
