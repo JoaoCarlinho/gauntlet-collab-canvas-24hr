@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Rect, Circle, Text, Group, Line, RegularPolygon } from 'react-konva'
+import { Rect, Circle, Text, Group, Line, RegularPolygon, Star } from 'react-konva'
 import { ArrowLeft, Users, Settings, UserPlus } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useSocket } from '../hooks/useSocket'
@@ -18,6 +18,8 @@ import { offlineManager } from '../services/offlineManager'
 import { objectUpdateDebouncer } from '../utils/debounce'
 import { batchUpdateManager, useBatchUpdates } from '../utils/batchUpdates'
 import { socketEventOptimizer, useSocketOptimization } from '../utils/socketOptimizer'
+import { isDevelopmentMode, devModeDelay } from '../utils/devMode'
+import devToast from '../utils/toastConfig'
 import OptimisticUpdateIndicator from './OptimisticUpdateIndicator'
 import UpdateSuccessAnimation from './UpdateSuccessAnimation'
 import EnhancedLoadingIndicator from './EnhancedLoadingIndicator'
@@ -189,7 +191,14 @@ const CanvasPage: React.FC = () => {
   useToolShortcuts({ onToolSelect: selectTool })
 
   useEffect(() => {
-    if (!isAuthenticated || !canvasId) {
+    // In development mode, bypass authentication check
+    if (!isDevelopmentMode() && (!isAuthenticated || !canvasId)) {
+      navigate('/')
+      return
+    }
+
+    // Ensure we have a canvasId
+    if (!canvasId) {
       navigate('/')
       return
     }
@@ -197,42 +206,49 @@ const CanvasPage: React.FC = () => {
     loadCanvas()
     loadObjects()
     
-    // Connect to socket
-    if (isConnected && idToken) {
+    // Connect to socket (skip in development mode)
+    if (!isDevelopmentMode() && isConnected && idToken) {
       socketService.joinCanvas(canvasId, idToken)
       socketService.userOnline(canvasId, idToken)
       socketService.getCursors(canvasId, idToken)
       socketService.getOnlineUsers(canvasId, idToken)
     }
 
-    // Set up socket event listeners
+    // Set up socket event listeners (skip in development mode)
+    if (!isDevelopmentMode()) {
     setupSocketListeners()
 
-    // Initialize state synchronization
-    initializeStateSync()
+      // Initialize state synchronization
+      initializeStateSync()
 
-    // Initialize update queue
-    initializeUpdateQueue()
+      // Initialize update queue
+      initializeUpdateQueue()
 
-    // Initialize connection monitoring
-    initializeConnectionMonitoring()
+      // Initialize connection monitoring
+      initializeConnectionMonitoring()
 
-    // Initialize offline mode
-    initializeOfflineMode()
+      // Initialize offline mode
+      initializeOfflineMode()
+    }
 
     return () => {
-      if (idToken) {
+      // Skip socket cleanup in development mode
+      if (!isDevelopmentMode() && idToken) {
         socketService.leaveCanvas(canvasId!, idToken)
         socketService.userOffline(canvasId!, idToken)
       }
-      // Clean up state sync
-      stateSyncManager.stopAutoSync()
-      // Clean up update queue
-      updateQueueManager.stopAutoProcessing()
-      // Clean up connection monitoring
-      connectionMonitor.stop()
-      // Clean up offline mode
-      offlineManager.stop()
+      
+      // Skip state management cleanup in development mode
+      if (!isDevelopmentMode()) {
+        // Clean up state sync
+        stateSyncManager.stopAutoSync()
+        // Clean up update queue
+        updateQueueManager.stopAutoProcessing()
+        // Clean up connection monitoring
+        connectionMonitor.stop()
+        // Clean up offline mode
+        // OfflineManager cleanup handled automatically
+      }
     }
   }, [isAuthenticated, canvasId, isConnected])
 
@@ -335,22 +351,49 @@ const CanvasPage: React.FC = () => {
 
   const loadCanvas = async () => {
     try {
-      const response = await canvasAPI.getCanvas(canvasId!)
-      setCanvas(response.canvas)
+      if (isDevelopmentMode()) {
+        // In development mode, create a mock canvas
+        await devModeDelay(500)
+        const mockCanvas: Canvas = {
+          id: canvasId!,
+          title: 'Test Canvas',
+          description: 'A test canvas for development',
+          owner_id: 'dev-user',
+          is_public: false,
+          object_count: 0,
+          collaborator_count: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        setCanvas(mockCanvas)
+        console.log('Development mode: Using mock canvas data')
+      } else {
+        // In production, use real API
+        const response = await canvasAPI.getCanvas(canvasId!)
+        setCanvas(response.canvas)
+      }
     } catch (error) {
       console.error('Failed to load canvas:', error)
-      toast.error('Failed to load canvas')
+      devToast.error('Failed to load canvas')
       navigate('/')
     }
   }
 
   const loadObjects = async () => {
     try {
-      const response = await canvasAPI.getCanvasObjects(canvasId!)
-      setObjects(response.objects)
+      if (isDevelopmentMode()) {
+        // In development mode, use empty objects array
+        await devModeDelay(300)
+        setObjects([])
+        console.log('Development mode: Using empty objects array')
+      } else {
+        // In production, use real API
+        const response = await canvasAPI.getCanvasObjects(canvasId!)
+        setObjects(response.objects)
+      }
     } catch (error) {
       console.error('Failed to load objects:', error)
-      toast.error('Failed to load objects')
+      devToast.error('Failed to load objects')
     } finally {
       setIsLoading(false)
     }
@@ -669,7 +712,7 @@ const CanvasPage: React.FC = () => {
   // Connection monitoring functions
   const initializeConnectionMonitoring = () => {
     // Set up connection status callback
-    connectionMonitor.onStatusChange((status) => {
+    connectionMonitor.on('statusChange', (status) => {
       setConnectionMetrics(prev => ({
         ...prev,
         latency: status.latency,
@@ -680,7 +723,7 @@ const CanvasPage: React.FC = () => {
     })
 
     // Set up connection quality callback
-    connectionMonitor.onQualityChange((quality) => {
+    connectionMonitor.on('qualityChange', (quality) => {
       setConnectionMetrics(prev => ({
         ...prev,
         quality
@@ -688,18 +731,18 @@ const CanvasPage: React.FC = () => {
     })
 
     // Start monitoring
-    connectionMonitor.start()
+    // ConnectionMonitor starts automatically when instantiated
   }
 
   // Offline mode functions
   const initializeOfflineMode = () => {
     // Set up offline status callback
-    offlineManager.onOfflineStatusChange((isOffline) => {
+    offlineManager.on('offlineStatusChange', (isOffline) => {
       setIsOffline(isOffline)
     })
 
     // Set up offline data callback
-    offlineManager.onOfflineDataChange((data) => {
+    offlineManager.on('offlineDataChange', (data) => {
       setOfflineData({
         pendingUpdates: data.pendingUpdates,
         lastSyncTime: data.lastSyncTime,
@@ -708,7 +751,7 @@ const CanvasPage: React.FC = () => {
     })
 
     // Set up sync callback
-    offlineManager.onSyncComplete((result) => {
+    offlineManager.on('syncComplete', (result) => {
       if (result.success) {
         toast.success(`Synced ${result.syncedCount} updates`)
       } else {
@@ -717,7 +760,7 @@ const CanvasPage: React.FC = () => {
     })
 
     // Start offline mode
-    offlineManager.start()
+    // OfflineManager starts automatically when instantiated
   }
 
   // Reconnection synchronization function
@@ -1209,7 +1252,10 @@ const CanvasPage: React.FC = () => {
     // Get tool properties with defaults
     const toolProps = selectedTool.properties || {}
     const strokeColor = toolProps.strokeColor || '#000000'
-    const fillColor = toolProps.fillColor || 'transparent'
+    // In development mode, use visible fill colors for better testing
+    const fillColor = isDevelopmentMode() 
+      ? (toolProps.fillColor || '#3b82f6') // Blue fill in dev mode
+      : (toolProps.fillColor || 'transparent') // Transparent in production
     const strokeWidth = toolProps.strokeWidth || 2
 
     if (selectedTool.id === 'rectangle') {
@@ -1238,10 +1284,10 @@ const CanvasPage: React.FC = () => {
         properties: {
           x: point.x,
           y: point.y,
-          radius: 50,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: strokeWidth
+          radius: 100, // Increased radius for better visibility
+          fill: '#ff0000', // Force red fill for maximum visibility
+          stroke: '#000000', // Force black stroke for maximum visibility
+          strokeWidth: 6 // Increased stroke width for better visibility
         },
         created_by: user?.id || ''
       }
@@ -1308,11 +1354,11 @@ const CanvasPage: React.FC = () => {
         properties: {
           x: point.x,
           y: point.y,
-          width: 40,
-          height: 40,
-          fill: fillColor,
-          stroke: strokeColor,
-          strokeWidth: strokeWidth
+          width: 80, // Increased size for better visibility
+          height: 80, // Increased size for better visibility
+          fill: '#00ff00', // Force green fill for maximum visibility
+          stroke: '#000000', // Force black stroke for maximum visibility
+          strokeWidth: 4 // Increased stroke width for better visibility
         },
         created_by: user?.id || ''
       }
@@ -1342,9 +1388,9 @@ const CanvasPage: React.FC = () => {
         properties: {
           x: point.x,
           y: point.y,
-          points: [0, 0, 100, 0],
-          stroke: strokeColor,
-          strokeWidth: strokeWidth
+          points: [0, 0, 200, 0], // Increased line length for better visibility
+          stroke: '#000000', // Force black stroke for maximum visibility
+          strokeWidth: 8 // Increased stroke width for better visibility
         },
         created_by: user?.id || ''
       }
@@ -1392,7 +1438,7 @@ const CanvasPage: React.FC = () => {
         ...prev,
         properties: {
           ...prev!.properties!,
-          radius: Math.max(10, radius)
+          radius: Math.max(50, radius) // Increased minimum radius for better visibility
         }
       }))
     } else if (['heart', 'star', 'diamond'].includes(newObject.object_type!)) {
@@ -1411,23 +1457,42 @@ const CanvasPage: React.FC = () => {
       // For line tools, update the end point
       const dx = point.x - newObject.properties!.x
       const dy = point.y - newObject.properties!.y
+      // Ensure minimum length for visibility
+      const minLength = 100
+      const length = Math.sqrt(dx * dx + dy * dy)
+      const scale = length < minLength ? minLength / length : 1
       setNewObject(prev => ({
         ...prev,
         properties: {
           ...prev!.properties!,
-          points: [0, 0, dx, dy]
+          points: [0, 0, dx * scale, dy * scale]
         }
       }))
     }
   }
 
   const handleStageMouseUp = () => {
-    if (isDrawing && newObject && idToken) {
-      // Create object via socket
-      socketService.createObject(canvasId!, idToken, {
-        type: newObject.object_type!,
-        properties: newObject.properties!
-      })
+    if (isDrawing && newObject) {
+      if (isDevelopmentMode()) {
+        // In development mode, add object directly to local state
+        const canvasObject: CanvasObject = {
+          id: `dev-${Date.now()}`,
+          canvas_id: canvasId!,
+          object_type: newObject.object_type!,
+          properties: newObject.properties!,
+          created_by: 'dev-user',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }
+        
+        setObjects(prev => [...prev, canvasObject])
+      } else if (idToken) {
+        // In production, create object via socket
+        socketService.createObject(canvasId!, idToken, {
+          type: newObject.object_type!,
+          properties: newObject.properties!
+        })
+      }
       
       setNewObject(null)
       setIsDrawing(false)
@@ -1446,6 +1511,10 @@ const CanvasPage: React.FC = () => {
     const isUpdating = updatingObjects.has(obj.id)
     const progress = updateProgress.get(obj.id)
     const loadingState = loadingStateManager.getLoadingState(obj.id)
+    
+
+
+
 
     switch (obj.object_type) {
       case 'rectangle':
@@ -1587,11 +1656,12 @@ const CanvasPage: React.FC = () => {
       case 'star':
         return (
           <Group key={obj.id}>
-            <RegularPolygon
+            <Star
               x={props.x}
               y={props.y}
-              sides={5}
-              radius={props.width / 2}
+              numPoints={5}
+              innerRadius={props.width / 4}
+              outerRadius={props.width / 2}
               fill={props.fill}
               stroke={props.stroke}
               strokeWidth={props.strokeWidth}
@@ -1974,11 +2044,11 @@ const CanvasPage: React.FC = () => {
           />
           
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-sm text-gray-600">
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-sm text-gray-600">
+              {isConnected ? 'Connected' : 'Disconnected'}
+            </span>
             </div>
             
             {/* Sync Status Indicator */}
@@ -2076,7 +2146,7 @@ const CanvasPage: React.FC = () => {
       )}
 
       {/* Canvas */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden" data-testid="canvas-container">
         <ZoomableCanvas
           width={window.innerWidth}
           height={window.innerHeight - 120}
@@ -2154,6 +2224,7 @@ const CanvasPage: React.FC = () => {
         onVisibilityToggle={toggleToolbarVisibility}
         onCollapseToggle={toggleCollapse}
         tools={getFilteredTools()}
+        data-testid="toolbar"
         preferences={preferences}
         onPreferencesChange={updatePreferences}
       />

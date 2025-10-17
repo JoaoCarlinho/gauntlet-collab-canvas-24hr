@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { WifiOff, Wifi, Sync, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
+import { WifiOff, Wifi, RefreshCw, AlertTriangle, CheckCircle, Clock } from 'lucide-react'
 import { offlineManager, OfflineState } from '../services/offlineManager'
 
 interface OfflineIndicatorProps {
@@ -31,19 +31,19 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       setState(offlineManager.getState())
     }
 
-    const handleSyncStarted = () => {
+    const handleRefreshCwStarted = () => {
       setState(offlineManager.getState())
     }
 
-    const handleSyncCompleted = () => {
+    const handleRefreshCwCompleted = () => {
       setState(offlineManager.getState())
     }
 
     // Listen to offline manager events
     offlineManager.on('offline', handleOffline)
     offlineManager.on('online', handleOnline)
-    offlineManager.on('sync_started', handleSyncStarted)
-    offlineManager.on('sync_completed', handleSyncCompleted)
+    offlineManager.on('sync_started', handleRefreshCwStarted)
+    offlineManager.on('sync_completed', handleRefreshCwCompleted)
     offlineManager.on('offline_update_added', handleStateUpdate)
     offlineManager.on('update_synced', handleStateUpdate)
 
@@ -53,8 +53,8 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
     return () => {
       offlineManager.off('offline', handleOffline)
       offlineManager.off('online', handleOnline)
-      offlineManager.off('sync_started', handleSyncStarted)
-      offlineManager.off('sync_completed', handleSyncCompleted)
+      offlineManager.off('sync_started', handleRefreshCwStarted)
+      offlineManager.off('sync_completed', handleRefreshCwCompleted)
       offlineManager.off('offline_update_added', handleStateUpdate)
       offlineManager.off('update_synced', handleStateUpdate)
     }
@@ -72,7 +72,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       return <WifiOff className="h-4 w-4" />
     }
     if (state.syncInProgress) {
-      return <Sync className="h-4 w-4 animate-spin" />
+      return <RefreshCw className="h-4 w-4 animate-spin" />
     }
     if (state.pendingUpdates.length > 0) {
       return <AlertTriangle className="h-4 w-4" />
@@ -85,7 +85,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
       return 'Offline'
     }
     if (state.syncInProgress) {
-      return 'Syncing...'
+      return 'RefreshCwing...'
     }
     if (state.pendingUpdates.length > 0) {
       return `${state.pendingUpdates.length} pending`
@@ -104,8 +104,8 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
     return new Date(timestamp).toLocaleTimeString()
   }
 
-  const handleForceSync = () => {
-    offlineManager.forceSync()
+  const handleForceRefreshCw = () => {
+    offlineManager.forceRefreshCw()
   }
 
   const handleClearOfflineData = () => {
@@ -175,7 +175,7 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
                   <span className="font-medium">{formatDuration(state.offlineDuration)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Sync Status:</span>
+                  <span>RefreshCw Status:</span>
                   <span className="font-medium">
                     {state.syncInProgress ? 'In Progress' : 'Idle'}
                   </span>
@@ -246,16 +246,16 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
                   <span className="font-medium">{formatDuration(state.totalOfflineTime)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Sync Operations:</span>
-                  <span className="font-medium">{state.totalSyncOperations}</span>
+                  <span>RefreshCw Operations:</span>
+                  <span className="font-medium">{state.totalRefreshCwOperations}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Successful Syncs:</span>
-                  <span className="font-medium text-green-600">{state.successfulSyncs}</span>
+                  <span>Successful RefreshCws:</span>
+                  <span className="font-medium text-green-600">{state.successfulRefreshCws}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Failed Syncs:</span>
-                  <span className="font-medium text-red-600">{state.failedSyncs}</span>
+                  <span>Failed RefreshCws:</span>
+                  <span className="font-medium text-red-600">{state.failedRefreshCws}</span>
                 </div>
               </div>
             </div>
@@ -264,12 +264,12 @@ const OfflineIndicator: React.FC<OfflineIndicatorProps> = ({
             <div className="flex space-x-2">
               {!state.isOffline && state.pendingUpdates.length > 0 && (
                 <button
-                  onClick={handleForceSync}
+                  onClick={handleForceRefreshCw}
                   disabled={state.syncInProgress}
                   className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center space-x-1"
                 >
-                  <Sync className="h-3 w-3" />
-                  <span>Force Sync</span>
+                  <RefreshCw className="h-3 w-3" />
+                  <span>Force RefreshCw</span>
                 </button>
               )}
               

@@ -15,11 +15,22 @@ const api = axios.create({
   timeout: 10000, // 10 second timeout
 })
 
-// Add auth token to requests
+// Add auth token to requests (skip in development mode)
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('idToken')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  // Check if we're in development mode
+  const isDevelopment = import.meta.env.DEV || 
+                       import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1'
+  
+  // Skip authentication in development mode
+  if (!isDevelopment) {
+    const token = localStorage.getItem('idToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+  } else {
+    console.log('Development mode: Skipping authentication for API request')
   }
   
   const fullUrl = (config.baseURL || '') + (config.url || '')

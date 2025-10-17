@@ -9,6 +9,18 @@ interface ProtectedRouteProps {
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth()
 
+  // Check if we're in development mode and should bypass authentication
+  const isDevelopment = import.meta.env.DEV || 
+                       import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1'
+
+  // In development mode, bypass authentication for testing
+  if (isDevelopment) {
+    console.log('Development mode: Bypassing authentication for testing')
+    return <>{children}</>
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

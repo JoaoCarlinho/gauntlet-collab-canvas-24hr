@@ -53,6 +53,7 @@ const ToolButton: React.FC<ToolButtonProps> = ({
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         disabled={disabled || !tool.isEnabled}
+        data-testid={`tool-${tool.id}`}
         className={`
           ${sizeClasses[size]}
           flex items-center justify-center

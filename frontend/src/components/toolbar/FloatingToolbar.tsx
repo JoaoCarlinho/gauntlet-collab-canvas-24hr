@@ -117,7 +117,7 @@ const FloatingToolbar: React.FC<FloatingToolbarProps> = ({
         fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200
         transition-all duration-300 ease-in-out
         ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-        ${isCollapsed ? 'w-12' : 'w-80'}
+        ${isCollapsed ? 'w-12' : 'w-48'}
       `}
       style={{
         left: position.x,

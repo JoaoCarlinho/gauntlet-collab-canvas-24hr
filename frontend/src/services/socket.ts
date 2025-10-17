@@ -8,20 +8,24 @@ class SocketService {
   private listeners: Map<string, Function[]> = new Map()
   private debugMode = import.meta.env.VITE_DEBUG_SOCKET === 'true'
 
-  connect(idToken: string) {
+  connect(idToken?: string) {
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    
+    // Check if we're in development mode
+    const isDevelopment = import.meta.env.DEV || 
+                         import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                         window.location.hostname === 'localhost' ||
+                         window.location.hostname === '127.0.0.1'
     
     // Only log in debug mode
     if (this.debugMode) {
       console.log('=== Socket.IO Connection Debug ===')
       console.log('API URL:', API_URL)
-      console.log('Token length:', idToken.length)
+      console.log('Development mode:', isDevelopment)
+      console.log('Token length:', idToken?.length || 0)
     }
     
-    this.socket = io(API_URL, {
-      auth: {
-        token: idToken
-      },
+    const socketConfig: any = {
       transports: ['polling', 'websocket'],
       upgrade: true,
       rememberUpgrade: true,
@@ -30,7 +34,18 @@ class SocketService {
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5
-    })
+    }
+    
+    // Only add auth token if not in development mode
+    if (!isDevelopment && idToken) {
+      socketConfig.auth = {
+        token: idToken
+      }
+    } else if (isDevelopment) {
+      console.log('Development mode: Connecting without authentication')
+    }
+    
+    this.socket = io(API_URL, socketConfig)
 
     this.socket.on('connect', () => {
       if (this.debugMode) {

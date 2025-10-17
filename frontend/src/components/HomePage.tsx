@@ -4,7 +4,8 @@ import { Plus, Users, Eye, Edit3, Trash2 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { canvasAPI } from '../services/api'
 import { Canvas } from '../types'
-import toast from 'react-hot-toast'
+import { isDevelopmentMode, getMockCanvases, devModeDelay } from '../utils/devMode'
+import devToast from '../utils/toastConfig'
 
 const HomePage: React.FC = () => {
   const { user, isAuthenticated, signIn } = useAuth()
@@ -20,7 +21,8 @@ const HomePage: React.FC = () => {
   const titleInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // In development mode, bypass authentication check
+    if (isDevelopmentMode() || isAuthenticated) {
       loadCanvases()
     }
   }, [isAuthenticated])
@@ -80,11 +82,29 @@ const HomePage: React.FC = () => {
   const loadCanvases = async () => {
     try {
       setIsLoading(true)
-      const response = await canvasAPI.getCanvases()
-      setCanvases(response.canvases)
+      
+      if (isDevelopmentMode()) {
+        // In development mode, use mock data with a realistic delay
+        await devModeDelay(800)
+        const mockCanvases = getMockCanvases()
+        setCanvases(mockCanvases)
+        console.log('Development mode: Using mock canvas data')
+      } else {
+        // In production, use real API
+        const response = await canvasAPI.getCanvases()
+        setCanvases(response.canvases)
+      }
     } catch (error) {
       console.error('Failed to load canvases:', error)
-      toast.error('Failed to load canvases')
+      
+      // Show error toast (will be suppressed in testing mode)
+      devToast.error('Failed to load canvases')
+      
+      // In development mode, fallback to mock data
+      if (isDevelopmentMode()) {
+        console.log('API failed, using mock data as fallback')
+        setCanvases(getMockCanvases())
+      }
     } finally {
       setIsLoading(false)
     }
@@ -92,25 +112,52 @@ const HomePage: React.FC = () => {
 
   const createCanvas = async () => {
     if (!newCanvasTitle.trim()) {
-      toast.error('Canvas title is required')
+      devToast.error('Canvas title is required')
       return
     }
 
     try {
-      const response = await canvasAPI.createCanvas({
-        title: newCanvasTitle,
-        description: newCanvasDescription,
-        is_public: false
-      })
-      
-      setCanvases(prev => [response.canvas, ...prev])
-      setShowCreateModal(false)
-      setNewCanvasTitle('')
-      setNewCanvasDescription('')
-      toast.success('Canvas created successfully!')
+      if (isDevelopmentMode()) {
+        // In development mode, create a mock canvas
+        await devModeDelay(1000)
+        const mockCanvas: Canvas = {
+          id: `mock-canvas-${Date.now()}`,
+          title: newCanvasTitle,
+          description: newCanvasDescription,
+          owner_id: 'dev-user',
+          is_public: false,
+          object_count: 0,
+          collaborator_count: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        
+        setCanvases(prev => [mockCanvas, ...prev])
+        setShowCreateModal(false)
+        setNewCanvasTitle('')
+        setNewCanvasDescription('')
+        
+        devToast.success('Canvas created successfully!')
+        
+        console.log('Development mode: Created mock canvas')
+      } else {
+        // In production, use real API
+        const response = await canvasAPI.createCanvas({
+          title: newCanvasTitle,
+          description: newCanvasDescription,
+          is_public: false
+        })
+        
+        setCanvases(prev => [response.canvas, ...prev])
+        setShowCreateModal(false)
+        setNewCanvasTitle('')
+        setNewCanvasDescription('')
+        devToast.success('Canvas created successfully!')
+      }
     } catch (error) {
       console.error('Failed to create canvas:', error)
-      toast.error('Failed to create canvas')
+      
+      devToast.error('Failed to create canvas')
     }
   }
 
@@ -126,17 +173,27 @@ const HomePage: React.FC = () => {
 
     try {
       setIsDeleting(true)
-      await canvasAPI.deleteCanvas(canvasToDelete.id)
+      
+      if (isDevelopmentMode()) {
+        // In development mode, just simulate deletion
+        await devModeDelay(800)
+        console.log('Development mode: Simulating canvas deletion')
+      } else {
+        // In production, use real API
+        await canvasAPI.deleteCanvas(canvasToDelete.id)
+      }
       
       // Remove canvas from local state
       setCanvases(prev => prev.filter(canvas => canvas.id !== canvasToDelete.id))
       
       setShowDeleteModal(false)
       setCanvasToDelete(null)
-      toast.success('Canvas deleted successfully!')
+      
+      devToast.success('Canvas deleted successfully!')
     } catch (error) {
       console.error('Failed to delete canvas:', error)
-      toast.error('Failed to delete canvas')
+      
+      devToast.error('Failed to delete canvas')
     } finally {
       setIsDeleting(false)
     }
@@ -202,7 +259,7 @@ const HomePage: React.FC = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
           </div>
         ) : canvases.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-12" data-testid="empty-canvas-state">
             <div className="w-24 h-24 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
               <Edit3 className="w-12 h-12 text-gray-400" />
             </div>

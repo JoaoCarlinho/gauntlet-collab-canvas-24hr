@@ -36,10 +36,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
+  // Check if we're in development mode
+  const isDevelopment = import.meta.env.DEV || 
+                       import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1'
+
   // Handle redirect result on app initialization (only if user came from redirect)
   useEffect(() => {
     const handleRedirectResult = async () => {
       console.log('=== App initialization - checking auth state ===')
+      
+      // In development mode, skip Firebase initialization
+      if (isDevelopment) {
+        console.log('Development mode: Skipping Firebase authentication')
+        setUser({
+          id: 'dev-user',
+          email: 'dev@example.com',
+          displayName: 'Development User',
+          permissions: ['read', 'write', 'admin']
+        })
+        setIsAuthenticated(true)
+        setIsLoading(false)
+        return
+      }
       
       // Initialize auth persistence first
       console.log('Initializing Firebase auth persistence...')
@@ -259,6 +279,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [isAuthenticated])
 
   useEffect(() => {
+    // In development mode, skip Firebase auth listener
+    if (isDevelopment) {
+      console.log('Development mode: Skipping Firebase auth state listener')
+      setIsLoading(false)
+      return
+    }
+
     // Delay setting up the auth state listener to ensure persistence is established
     const setupAuthListener = async () => {
       console.log('Setting up Firebase auth state listener...')

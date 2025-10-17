@@ -66,7 +66,13 @@
     "test:multi-user": "cypress run --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts",
     "test:multi-user:open": "cypress open --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts",
     "test:comprehensive": "npm run test:e2e:auth && npm run test:screenshots",
-    "test:full-suite": "npm run test:comprehensive && npm run test:auth-objects && npm run test:multi-user"
+    "test:full-suite": "npm run test:comprehensive && npm run test:auth-objects && npm run test:multi-user",
+    "test:dev-screenshots": "cypress run --spec 'cypress/e2e/dev-screenshot-generation.cy.ts' --config-file cypress.config.auth.ts",
+    "test:dev-screenshots:open": "cypress open --spec 'cypress/e2e/dev-screenshot-generation.cy.ts' --config-file cypress.config.auth.ts",
+    "test:canvas-videos": "cypress run --spec 'cypress/e2e/canvas-object-videos.cy.ts' --config-file cypress.config.auth.ts",
+    "test:canvas-videos:open": "cypress open --spec 'cypress/e2e/canvas-object-videos.cy.ts' --config-file cypress.config.auth.ts",
+    "test:objects-all-types-video": "cypress run --spec 'cypress/e2e/dev-objects-all-types-video.cy.ts' --config-file cypress.config.auth.ts",
+    "test:objects-all-types-video:open": "cypress open --spec 'cypress/e2e/dev-objects-all-types-video.cy.ts' --config-file cypress.config.auth.ts"
   },
   "dependencies": {
     "react": "^18.2.0",

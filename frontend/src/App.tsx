@@ -24,6 +24,11 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            {/* Development route for testing without authentication */}
+            <Route 
+              path="/dev/canvas/:canvasId" 
+              element={<CanvasPage />} 
+            />
           </Routes>
         </div>
       </SocketProvider>

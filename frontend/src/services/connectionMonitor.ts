@@ -2,7 +2,34 @@
  * Connection Monitor Service for real-time connection status tracking
  */
 
-import { EventEmitter } from 'events'
+// Create a simple EventEmitter-like class for browser compatibility
+class SimpleEventEmitter {
+  private listeners: Map<string, Function[]> = new Map()
+
+  on(event: string, listener: Function) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, [])
+    }
+    this.listeners.get(event)!.push(listener)
+  }
+
+  off(event: string, listener: Function) {
+    const eventListeners = this.listeners.get(event)
+    if (eventListeners) {
+      const index = eventListeners.indexOf(listener)
+      if (index > -1) {
+        eventListeners.splice(index, 1)
+      }
+    }
+  }
+
+  emit(event: string, ...args: any[]) {
+    const eventListeners = this.listeners.get(event)
+    if (eventListeners) {
+      eventListeners.forEach(listener => listener(...args))
+    }
+  }
+}
 
 export interface ConnectionStatus {
   isConnected: boolean
@@ -39,7 +66,7 @@ export interface NetworkQualityMetrics {
   stability: number
 }
 
-class ConnectionMonitor extends EventEmitter {
+class ConnectionMonitor extends SimpleEventEmitter {
   private status: ConnectionStatus
   private events: ConnectionEvent[] = []
   private maxEvents = 1000

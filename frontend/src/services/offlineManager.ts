@@ -2,7 +2,34 @@
  * Offline Manager Service for handling offline mode and data synchronization
  */
 
-import { EventEmitter } from 'events'
+// Create a simple EventEmitter-like class for browser compatibility
+class SimpleEventEmitter {
+  private listeners: Map<string, Function[]> = new Map()
+
+  on(event: string, listener: Function) {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, [])
+    }
+    this.listeners.get(event)!.push(listener)
+  }
+
+  off(event: string, listener: Function) {
+    const eventListeners = this.listeners.get(event)
+    if (eventListeners) {
+      const index = eventListeners.indexOf(listener)
+      if (index > -1) {
+        eventListeners.splice(index, 1)
+      }
+    }
+  }
+
+  emit(event: string, ...args: any[]) {
+    const eventListeners = this.listeners.get(event)
+    if (eventListeners) {
+      eventListeners.forEach(listener => listener(...args))
+    }
+  }
+}
 import { CanvasObject } from '../types'
 import { errorLogger } from '../utils/errorLogger'
 
@@ -38,7 +65,7 @@ export interface SyncResult {
   duration: number
 }
 
-class OfflineManager extends EventEmitter {
+class OfflineManager extends SimpleEventEmitter {
   private state: OfflineState
   private syncQueue: OfflineUpdate[] = []
   private maxOfflineUpdates = 1000

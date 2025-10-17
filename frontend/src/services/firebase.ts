@@ -13,18 +13,25 @@ import {
   browserSessionPersistence
 } from 'firebase/auth'
 
+// Check if we're in development mode and should skip Firebase initialization
+const isDevelopment = import.meta.env.DEV || 
+                     import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                     window.location.hostname === 'localhost' ||
+                     window.location.hostname === '127.0.0.1'
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'dev-api-key',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || 'dev-project.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || 'dev-project',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'dev-project.appspot.com',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '1:123456789:web:dev',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || 'G-DEV',
 }
 
 // Debug Firebase configuration
 console.log('Firebase configuration check:', {
+  isDevelopment,
   hasApiKey: !!firebaseConfig.apiKey,
   hasAuthDomain: !!firebaseConfig.authDomain,
   hasProjectId: !!firebaseConfig.projectId,
@@ -36,14 +43,42 @@ console.log('Firebase configuration check:', {
   projectId: firebaseConfig.projectId
 })
 
-const app = initializeApp(firebaseConfig)
-export const auth = getAuth(app)
+let app: any = null
+let auth: any = null
 
-console.log('Firebase app initialized:', {
-  appName: app.name,
-  authDomain: firebaseConfig.authDomain,
-  projectId: firebaseConfig.projectId
-})
+// Only initialize Firebase if not in development mode or if we have valid config
+if (!isDevelopment || (firebaseConfig.apiKey && firebaseConfig.apiKey !== 'dev-api-key')) {
+  try {
+    app = initializeApp(firebaseConfig)
+    auth = getAuth(app)
+    console.log('Firebase app initialized:', {
+      appName: app.name,
+      authDomain: firebaseConfig.authDomain,
+      projectId: firebaseConfig.projectId
+    })
+  } catch (error) {
+    console.warn('Firebase initialization failed:', error)
+    app = null
+    auth = null
+  }
+} else {
+  console.log('Development mode: Skipping Firebase initialization')
+  // Create mock auth object for development
+  auth = {
+    currentUser: null,
+    onAuthStateChanged: (callback: any) => {
+      // Mock auth state change - no user in development
+      callback(null)
+      return () => {} // unsubscribe function
+    },
+    signInWithPopup: () => Promise.reject(new Error('Firebase not initialized in development mode')),
+    signInWithRedirect: () => Promise.reject(new Error('Firebase not initialized in development mode')),
+    signOut: () => Promise.resolve(),
+    getIdToken: () => Promise.resolve('dev-token')
+  }
+}
+
+export { auth }
 
 // Configure Firebase auth persistence
 export const initializeAuthPersistence = async (): Promise<void> => {

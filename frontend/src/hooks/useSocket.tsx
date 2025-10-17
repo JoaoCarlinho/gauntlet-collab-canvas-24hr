@@ -22,11 +22,23 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState(false)
   const { isAuthenticated, user } = useAuth()
 
+  // Check if we're in development mode
+  const isDevelopment = import.meta.env.DEV || 
+                       import.meta.env.VITE_DEBUG_MODE === 'true' ||
+                       window.location.hostname === 'localhost' ||
+                       window.location.hostname === '127.0.0.1'
+
   const connect = () => {
-    const idToken = localStorage.getItem('idToken')
-    if (idToken && isAuthenticated) {
-      socketService.connect(idToken)
-      setIsConnected(true)
+    if (isDevelopment) {
+      // In development mode, skip socket connection entirely
+      console.log('Development mode: Skipping socket connection')
+      setIsConnected(false) // Set to false to prevent socket operations
+    } else {
+      const idToken = localStorage.getItem('idToken')
+      if (idToken && isAuthenticated) {
+        socketService.connect(idToken)
+        setIsConnected(true)
+      }
     }
   }
 
@@ -36,18 +48,29 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }
 
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isDevelopment) {
+      // In development mode, skip socket connection entirely
+      console.log('Development mode: Skipping socket connection in useEffect')
+      setIsConnected(false)
+    } else if (isAuthenticated && user) {
       connect()
     } else {
       disconnect()
     }
 
     return () => {
-      disconnect()
+      if (!isDevelopment) {
+        disconnect()
+      }
     }
-  }, [isAuthenticated, user])
+  }, [isAuthenticated, user, isDevelopment])
 
   useEffect(() => {
+    // Skip socket event listeners in development mode
+    if (isDevelopment) {
+      return
+    }
+
     const handleConnect = () => setIsConnected(true)
     const handleDisconnect = () => setIsConnected(false)
 
@@ -58,7 +81,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       socketService.off('connect', handleConnect)
       socketService.off('disconnect', handleDisconnect)
     }
-  }, [])
+  }, [isDevelopment])
 
   const value: SocketContextType = {
     isConnected,

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Group, Line, Circle, RegularPolygon } from 'react-konva'
+import { Group, Line, Circle, RegularPolygon, Star } from 'react-konva'
 import { ToolProperties } from '../types/toolbar'
 
 interface PointerIndicatorProps {
@@ -70,11 +70,12 @@ const PointerIndicator: React.FC<PointerIndicatorProps> = ({
       case 'star':
         return (
           <Group x={position.x} y={position.y}>
-            <RegularPolygon
+            <Star
               x={0}
               y={0}
-              sides={5}
-              radius={halfSize}
+              numPoints={5}
+              innerRadius={halfSize * 0.4}
+              outerRadius={halfSize}
               fill="transparent"
               {...commonProps}
             />
