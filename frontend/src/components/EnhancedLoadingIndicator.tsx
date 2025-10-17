@@ -26,7 +26,7 @@ const EnhancedLoadingIndicator: React.FC<EnhancedLoadingIndicatorProps> = ({
   const x = props.x || 0
   const y = props.y || 0
   const width = props.width || 100
-  const height = props.height || 100
+  // const height = props.height || 100
 
   // Calculate indicator position (top-right corner of object)
   const indicatorX = x + width - 25

@@ -3,7 +3,8 @@
  */
 
 import React, { useState } from 'react'
-import { X, AlertTriangle, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
+import { X, AlertTriangle } from 'lucide-react'
+// import { RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import { StateConflict } from '../services/stateSyncManager'
 
 interface ConflictResolutionDialogProps {

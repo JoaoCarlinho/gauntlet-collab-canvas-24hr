@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Pre-Push Validation Script
-# Runs comprehensive tests before every push to origin
+# 🚀 CollabCanvas Pre-Push Validation Script
+# Comprehensive validation pipeline before every push
 
-set -e
+set -e  # Exit on any error
 
 # Colors for output
 RED='\033[0;31m'
@@ -11,409 +11,400 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPTS_DIR="$PROJECT_ROOT/scripts"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 BACKEND_DIR="$PROJECT_ROOT/backend"
-DOCS_DIR="$PROJECT_ROOT/docs"
+REPORTS_DIR="$PROJECT_ROOT/reports"
+LOGS_DIR="$PROJECT_ROOT/logs"
 
-# Function to print colored output
-print_header() {
-    echo -e "${PURPLE}================================${NC}"
-    echo -e "${PURPLE}$1${NC}"
-    echo -e "${PURPLE}================================${NC}"
-}
+# Create directories if they don't exist
+mkdir -p "$REPORTS_DIR" "$LOGS_DIR"
 
-print_status() {
+# Logging
+LOG_FILE="$LOGS_DIR/pre-push-validation-$(date +%Y%m%d-%H%M%S).log"
+exec > >(tee -a "$LOG_FILE")
+exec 2>&1
+
+# Validation results
+VALIDATION_RESULTS=()
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+START_TIME=$(date +%s)
+
+# Helper functions
+log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
-print_success() {
+log_success() {
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
-print_warning() {
+log_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-print_error() {
+log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Function to check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
+log_step() {
+    echo -e "${PURPLE}[STEP]${NC} $1"
 }
 
-# Function to run tests with timeout
-run_with_timeout() {
-    local timeout=$1
-    local command="$2"
-    local description="$3"
+# Validation functions
+validate_prerequisites() {
+    log_step "🔍 Validating Prerequisites"
     
-    print_status "Running: $description"
-    print_status "Command: $command"
-    print_status "Timeout: ${timeout}s"
-    
-    if timeout "$timeout" bash -c "$command"; then
-        print_success "$description completed successfully"
-        return 0
-    else
-        local exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-            print_error "$description timed out after ${timeout}s"
-        else
-            print_error "$description failed with exit code $exit_code"
-        fi
-        return $exit_code
-    fi
-}
-
-# Check prerequisites
-check_prerequisites() {
-    print_header "Checking Prerequisites"
+    local missing_deps=()
     
     # Check Node.js
-    if ! command_exists node; then
-        print_error "Node.js is not installed"
-        exit 1
+    if ! command -v node &> /dev/null; then
+        missing_deps+=("Node.js")
+    else
+        local node_version=$(node --version)
+        log_success "Node.js: $node_version"
     fi
-    print_success "Node.js is installed: $(node --version)"
     
     # Check npm
-    if ! command_exists npm; then
-        print_error "npm is not installed"
-        exit 1
+    if ! command -v npm &> /dev/null; then
+        missing_deps+=("npm")
+    else
+        local npm_version=$(npm --version)
+        log_success "npm: $npm_version"
     fi
-    print_success "npm is installed: $(npm --version)"
     
     # Check Python
-    if ! command_exists python3; then
-        print_error "Python 3 is not installed"
-        exit 1
-    fi
-    print_success "Python 3 is installed: $(python3 --version)"
-    
-    # Check Firebase CLI
-    if ! command_exists firebase; then
-        print_warning "Firebase CLI is not installed - some tests may be skipped"
+    if ! command -v python3 &> /dev/null; then
+        missing_deps+=("Python 3")
     else
-        print_success "Firebase CLI is installed: $(firebase --version)"
+        local python_version=$(python3 --version)
+        log_success "Python: $python_version"
     fi
     
-    # Check Cypress
-    if [ ! -d "$FRONTEND_DIR/node_modules/cypress" ]; then
-        print_warning "Cypress is not installed - installing now..."
-        cd "$FRONTEND_DIR"
-        npm install cypress --save-dev
-        cd "$PROJECT_ROOT"
+    # Check pip
+    if ! command -v pip3 &> /dev/null; then
+        missing_deps+=("pip3")
+    else
+        local pip_version=$(pip3 --version | cut -d' ' -f2)
+        log_success "pip: $pip_version"
     fi
-    print_success "Cypress is available"
+    
+    # Check Git
+    if ! command -v git &> /dev/null; then
+        missing_deps+=("Git")
+    else
+        local git_version=$(git --version | cut -d' ' -f3)
+        log_success "Git: $git_version"
+    fi
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        log_error "Missing dependencies: ${missing_deps[*]}"
+        return 1
+    fi
+    
+    log_success "All prerequisites validated"
+    return 0
 }
 
-# Setup test environment
-setup_test_environment() {
-    print_header "Setting Up Test Environment"
+validate_frontend_dependencies() {
+    log_step "📦 Validating Frontend Dependencies"
     
-    # Create docs directory if it doesn't exist
-    mkdir -p "$DOCS_DIR"
-    mkdir -p "$DOCS_DIR/screenshots"
+    cd "$FRONTEND_DIR"
     
-    # Run Firebase authentication setup
-    if [ -f "$SCRIPTS_DIR/setup-test-auth.sh" ]; then
-        print_status "Setting up Firebase authentication..."
-        if "$SCRIPTS_DIR/setup-test-auth.sh"; then
-            print_success "Firebase authentication setup completed"
-        else
-            print_warning "Firebase authentication setup failed - continuing with limited tests"
-        fi
-    else
-        print_warning "Firebase setup script not found - skipping authentication setup"
+    if [ ! -f "package.json" ]; then
+        log_error "package.json not found in frontend directory"
+        return 1
     fi
+    
+    if [ ! -d "node_modules" ]; then
+        log_warning "node_modules not found, installing dependencies..."
+        npm install
+    fi
+    
+    log_success "Frontend dependencies validated"
+    return 0
 }
 
-# Run unit tests
-run_unit_tests() {
-    print_header "Running Unit Tests"
+validate_backend_dependencies() {
+    log_step "🐍 Validating Backend Dependencies"
     
-    # Frontend unit tests
-    if [ -d "$FRONTEND_DIR" ]; then
-        cd "$FRONTEND_DIR"
-        
-        # Install dependencies if needed
-        if [ ! -d "node_modules" ]; then
-            print_status "Installing frontend dependencies..."
-            npm install
-        fi
-        
-        # Run TypeScript compilation check
-        print_status "Running TypeScript compilation check..."
-        if run_with_timeout 60 "npm run build"; then
-            print_success "TypeScript compilation successful"
+    cd "$BACKEND_DIR"
+    
+    if [ ! -f "requirements.txt" ]; then
+        log_error "requirements.txt not found in backend directory"
+        return 1
+    fi
+    
+    # Check if virtual environment exists
+    if [ ! -d "venv" ]; then
+        log_warning "Virtual environment not found, creating one..."
+        python3 -m venv venv
+    fi
+    
+    # Activate virtual environment and install dependencies
+    source venv/bin/activate
+    pip install -r requirements.txt
+    
+    log_success "Backend dependencies validated"
+    return 0
+}
+
+run_frontend_linting() {
+    log_step "🔍 Running Frontend Linting"
+    
+    cd "$FRONTEND_DIR"
+    
+    # TypeScript compilation check
+    log_info "Checking TypeScript compilation..."
+    if npm run build --silent; then
+        log_success "TypeScript compilation successful"
+        ((PASSED_TESTS++))
+    else
+        log_error "TypeScript compilation failed"
+        ((FAILED_TESTS++))
+        return 1
+    fi
+    
+    # ESLint check
+    log_info "Running ESLint..."
+    if npx eslint src --ext .ts,.tsx --max-warnings 0; then
+        log_success "ESLint passed"
+        ((PASSED_TESTS++))
+    else
+        log_error "ESLint failed"
+        ((FAILED_TESTS++))
+        return 1
+    fi
+    
+    ((TOTAL_TESTS += 2))
+    return 0
+}
+
+run_backend_tests() {
+    log_step "🧪 Running Backend Tests"
+    
+    cd "$BACKEND_DIR"
+    source venv/bin/activate
+    
+    # Run Python tests
+    log_info "Running Python tests..."
+    if python -m pytest tests/ -v --tb=short; then
+        log_success "Backend tests passed"
+        ((PASSED_TESTS++))
+    else
+        log_error "Backend tests failed"
+        ((FAILED_TESTS++))
+        return 1
+    fi
+    
+    ((TOTAL_TESTS++))
+    return 0
+}
+
+run_integration_tests() {
+    log_step "🔗 Running Integration Tests"
+    
+    # Start backend server in background
+    cd "$BACKEND_DIR"
+    source venv/bin/activate
+    log_info "Starting backend server..."
+    python run.py &
+    BACKEND_PID=$!
+    
+    # Wait for backend to start
+    sleep 5
+    
+    # Start frontend server in background
+    cd "$FRONTEND_DIR"
+    log_info "Starting frontend server..."
+    npm run dev &
+    FRONTEND_PID=$!
+    
+    # Wait for frontend to start
+    sleep 10
+    
+    # Test server connectivity
+    log_info "Testing server connectivity..."
+    if curl -f http://localhost:5000/health &> /dev/null; then
+        log_success "Backend server is running"
+        ((PASSED_TESTS++))
+    else
+        log_error "Backend server is not responding"
+        ((FAILED_TESTS++))
+    fi
+    
+    if curl -f http://localhost:3000 &> /dev/null; then
+        log_success "Frontend server is running"
+        ((PASSED_TESTS++))
+    else
+        log_error "Frontend server is not responding"
+        ((FAILED_TESTS++))
+    fi
+    
+    # Cleanup
+    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null || true
+    sleep 2
+    
+    ((TOTAL_TESTS += 2))
+    return 0
+}
+
+run_e2e_tests() {
+    log_step "🎭 Running E2E Tests"
+    
+    cd "$FRONTEND_DIR"
+    
+    # Run authenticated object tests
+    log_info "Running authenticated object tests..."
+    if npx cypress run --spec 'cypress/e2e/authenticated-object-tests.cy.ts' --config-file cypress.config.auth.ts --headless; then
+        log_success "Authenticated object tests passed"
+        ((PASSED_TESTS++))
+    else
+        log_error "Authenticated object tests failed"
+        ((FAILED_TESTS++))
+    fi
+    
+    # Run multi-user collaboration tests
+    log_info "Running multi-user collaboration tests..."
+    if npx cypress run --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts --headless; then
+        log_success "Multi-user collaboration tests passed"
+        ((PASSED_TESTS++))
+    else
+        log_error "Multi-user collaboration tests failed"
+        ((FAILED_TESTS++))
+    fi
+    
+    # Run authentication error scenarios
+    log_info "Running authentication error scenarios..."
+    if npx cypress run --spec 'cypress/e2e/auth-error-scenarios.cy.ts' --config-file cypress.config.auth.ts --headless; then
+        log_success "Authentication error scenarios passed"
+        ((PASSED_TESTS++))
+    else
+        log_error "Authentication error scenarios failed"
+        ((FAILED_TESTS++))
+    fi
+    
+    ((TOTAL_TESTS += 3))
+    return 0
+}
+
+generate_screenshots() {
+    log_step "📸 Generating Screenshots"
+    
+    cd "$FRONTEND_DIR"
+    
+    # Run screenshot generation tests
+    log_info "Generating comprehensive screenshots..."
+    if npx cypress run --spec 'cypress/e2e/dev-screenshot-generation.cy.ts' --config-file cypress.config.auth.ts --headless; then
+        log_success "Screenshot generation completed"
+        ((PASSED_TESTS++))
+    else
+        log_error "Screenshot generation failed"
+        ((FAILED_TESTS++))
+        return 1
+    fi
+    
+    ((TOTAL_TESTS++))
+    return 0
+}
+
+generate_test_report() {
+    log_step "📊 Generating Test Report"
+    
+    # Call the test report generation script
+    if [ -f "$SCRIPT_DIR/generate-test-report.sh" ]; then
+        log_info "Generating comprehensive test report..."
+        if bash "$SCRIPT_DIR/generate-test-report.sh"; then
+            log_success "Test report generated successfully"
+            ((PASSED_TESTS++))
         else
-            print_error "TypeScript compilation failed"
+            log_error "Test report generation failed"
+            ((FAILED_TESTS++))
             return 1
         fi
-        
-        # Run linting
-        print_status "Running ESLint..."
-        if run_with_timeout 30 "npm run lint"; then
-            print_success "ESLint passed"
-        else
-            print_warning "ESLint found issues - continuing with tests"
-        fi
-        
-        cd "$PROJECT_ROOT"
+    else
+        log_warning "Test report generation script not found, skipping..."
     fi
     
-    # Backend unit tests
-    if [ -d "$BACKEND_DIR" ]; then
-        cd "$BACKEND_DIR"
-        
-        # Install dependencies if needed
-        if [ ! -d "venv" ]; then
-            print_status "Creating Python virtual environment..."
-            python3 -m venv venv
-        fi
-        
-        # Activate virtual environment
-        source venv/bin/activate
-        
-        # Install dependencies
-        if [ -f "requirements.txt" ]; then
-            print_status "Installing backend dependencies..."
-            pip install -r requirements.txt
-        fi
-        
-        # Run Python tests
-        if [ -d "tests" ]; then
-            print_status "Running Python unit tests..."
-            if run_with_timeout 60 "python -m pytest tests/ -v"; then
-                print_success "Python unit tests passed"
-            else
-                print_warning "Python unit tests failed - continuing with other tests"
-            fi
-        fi
-        
-        deactivate
-        cd "$PROJECT_ROOT"
-    fi
+    ((TOTAL_TESTS++))
+    return 0
 }
 
-# Run integration tests
-run_integration_tests() {
-    print_header "Running Integration Tests"
-    
-    # Start backend server for integration tests
-    if [ -d "$BACKEND_DIR" ]; then
-        print_status "Starting backend server for integration tests..."
-        cd "$BACKEND_DIR"
-        source venv/bin/activate
-        
-        # Start server in background
-        python run.py &
-        BACKEND_PID=$!
-        
-        # Wait for server to start
-        sleep 5
-        
-        # Check if server is running
-        if curl -f http://localhost:5000/health >/dev/null 2>&1; then
-            print_success "Backend server started successfully"
-        else
-            print_warning "Backend server health check failed - continuing with limited tests"
-        fi
-        
-        cd "$PROJECT_ROOT"
-    fi
-    
-    # Run frontend integration tests
-    if [ -d "$FRONTEND_DIR" ]; then
-        cd "$FRONTEND_DIR"
-        
-        # Start frontend dev server
-        print_status "Starting frontend development server..."
-        npm run dev &
-        FRONTEND_PID=$!
-        
-        # Wait for server to start
-        sleep 10
-        
-        # Check if server is running
-        if curl -f http://localhost:5173 >/dev/null 2>&1; then
-            print_success "Frontend server started successfully"
-        else
-            print_warning "Frontend server health check failed - continuing with limited tests"
-        fi
-        
-        cd "$PROJECT_ROOT"
-    fi
-}
-
-# Run E2E tests with authentication
-run_e2e_tests() {
-    print_header "Running E2E Tests with Authentication"
-    
-    if [ -d "$FRONTEND_DIR" ]; then
-        cd "$FRONTEND_DIR"
-        
-        # Run authenticated object tests
-        print_status "Running authenticated object manipulation tests..."
-        if run_with_timeout 300 "npx cypress run --spec 'cypress/e2e/authenticated-object-tests.cy.ts' --config-file cypress.config.auth.ts"; then
-            print_success "Authenticated object tests passed"
-        else
-            print_warning "Authenticated object tests failed - continuing with other tests"
-        fi
-        
-        # Run multi-user collaboration tests
-        print_status "Running multi-user collaboration tests..."
-        if run_with_timeout 300 "npx cypress run --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts"; then
-            print_success "Multi-user collaboration tests passed"
-        else
-            print_warning "Multi-user collaboration tests failed - continuing with other tests"
-        fi
-        
-        cd "$PROJECT_ROOT"
-    fi
-}
-
-# Generate screenshots and documentation
-generate_screenshots() {
-    print_header "Generating Screenshots and Documentation"
-    
-    if [ -d "$FRONTEND_DIR" ]; then
-        cd "$FRONTEND_DIR"
-        
-        # Run screenshot generation tests
-        print_status "Generating comprehensive screenshots..."
-        if run_with_timeout 600 "npx cypress run --spec 'cypress/e2e/screenshot-generation.cy.ts' --config-file cypress.config.auth.ts"; then
-            print_success "Screenshot generation completed"
-        else
-            print_warning "Screenshot generation failed - continuing with other tests"
-        fi
-        
-        # Copy screenshots to docs directory
-        if [ -d "cypress/screenshots" ]; then
-            print_status "Copying screenshots to documentation directory..."
-            cp -r cypress/screenshots/* "$DOCS_DIR/screenshots/" 2>/dev/null || true
-            print_success "Screenshots copied to docs/screenshots/"
-        fi
-        
-        cd "$PROJECT_ROOT"
-    fi
-}
-
-# Generate test reports
-generate_test_reports() {
-    print_header "Generating Test Reports"
-    
-    # Create HTML test report
-    cat > "$DOCS_DIR/e2e-test-results.html" << EOF
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E2E Test Results - CollabCanvas</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { background: #f0f0f0; padding: 20px; border-radius: 5px; }
-        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
-        .success { background: #d4edda; border-color: #c3e6cb; }
-        .warning { background: #fff3cd; border-color: #ffeaa7; }
-        .error { background: #f8d7da; border-color: #f5c6cb; }
-        .screenshot { max-width: 100%; height: auto; margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>CollabCanvas E2E Test Results</h1>
-        <p>Generated on: $(date)</p>
-        <p>Branch: $(git branch --show-current)</p>
-        <p>Commit: $(git rev-parse HEAD)</p>
-    </div>
-    
-    <div class="test-section success">
-        <h2>✅ Test Summary</h2>
-        <p>All critical tests have been executed successfully.</p>
-    </div>
-    
-    <div class="test-section">
-        <h2>📸 Screenshots</h2>
-        <p>Screenshots have been generated and are available in the docs/screenshots/ directory.</p>
-    </div>
-    
-    <div class="test-section">
-        <h2>📊 Performance Metrics</h2>
-        <p>Performance tests have been executed and metrics are available in the debug panel.</p>
-    </div>
-</body>
-</html>
-EOF
-    
-    print_success "Test report generated: $DOCS_DIR/e2e-test-results.html"
-}
-
-# Cleanup function
 cleanup() {
-    print_header "Cleaning Up"
+    log_step "🧹 Cleaning Up"
     
-    # Kill background processes
-    if [ ! -z "$BACKEND_PID" ]; then
-        print_status "Stopping backend server..."
-        kill $BACKEND_PID 2>/dev/null || true
-    fi
+    # Kill any remaining processes
+    pkill -f "python run.py" 2>/dev/null || true
+    pkill -f "npm run dev" 2>/dev/null || true
+    pkill -f "cypress" 2>/dev/null || true
     
-    if [ ! -z "$FRONTEND_PID" ]; then
-        print_status "Stopping frontend server..."
-        kill $FRONTEND_PID 2>/dev/null || true
-    fi
+    # Clean up temporary files
+    rm -f "$FRONTEND_DIR/cypress/screenshots/temp-*" 2>/dev/null || true
     
-    # Clean up test data
-    if [ -f "$SCRIPTS_DIR/cleanup-test-data.sh" ]; then
-        print_status "Cleaning up test data..."
-        "$SCRIPTS_DIR/cleanup-test-data.sh"
-    fi
-    
-    print_success "Cleanup completed"
+    log_success "Cleanup completed"
 }
 
-# Main execution
+# Main validation function
 main() {
-    print_header "CollabCanvas Pre-Push Validation"
-    print_status "Starting comprehensive validation before push to origin..."
+    log_info "🚀 Starting CollabCanvas Pre-Push Validation"
+    log_info "Timestamp: $(date)"
+    log_info "Project Root: $PROJECT_ROOT"
+    log_info "Log File: $LOG_FILE"
     
-    # Set up trap for cleanup
-    trap cleanup EXIT
+    # Validation steps
+    local validation_steps=(
+        "validate_prerequisites"
+        "validate_frontend_dependencies"
+        "validate_backend_dependencies"
+        "run_frontend_linting"
+        "run_backend_tests"
+        "run_integration_tests"
+        "run_e2e_tests"
+        "generate_screenshots"
+        "generate_test_report"
+    )
     
-    # Run all validation steps
-    check_prerequisites
-    setup_test_environment
-    run_unit_tests
-    run_integration_tests
-    run_e2e_tests
-    generate_screenshots
-    generate_test_reports
+    local failed_steps=()
     
-    print_header "Validation Complete"
-    print_success "All tests have been executed successfully!"
-    print_status "Screenshots and documentation have been generated."
-    print_status "Ready to push to origin."
+    for step in "${validation_steps[@]}"; do
+        if ! $step; then
+            failed_steps+=("$step")
+            log_error "Validation step failed: $step"
+        fi
+    done
     
-    # Show summary
-    echo ""
-    print_status "Summary:"
-    echo "  - Unit tests: ✅ Passed"
-    echo "  - Integration tests: ✅ Passed"
-    echo "  - E2E tests: ✅ Passed"
-    echo "  - Screenshots: ✅ Generated"
-    echo "  - Documentation: ✅ Updated"
-    echo ""
-    print_success "Pre-push validation completed successfully!"
+    # Calculate results
+    local end_time=$(date +%s)
+    local duration=$((end_time - START_TIME))
+    
+    # Generate summary
+    log_step "📋 Validation Summary"
+    log_info "Total Tests: $TOTAL_TESTS"
+    log_info "Passed: $PASSED_TESTS"
+    log_info "Failed: $FAILED_TESTS"
+    log_info "Duration: ${duration}s"
+    
+    if [ ${#failed_steps[@]} -eq 0 ]; then
+        log_success "🎉 All validations passed! Ready to push."
+        cleanup
+        exit 0
+    else
+        log_error "❌ Validation failed. Failed steps: ${failed_steps[*]}"
+        log_error "Please fix the issues before pushing."
+        cleanup
+        exit 1
+    fi
 }
+
+# Handle script interruption
+trap cleanup EXIT
 
 # Run main function
 main "$@"

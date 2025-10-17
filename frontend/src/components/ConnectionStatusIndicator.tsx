@@ -3,7 +3,8 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { Wifi, WifiOff, AlertTriangle, CheckCircle, Clock, Activity } from 'lucide-react'
+import { Wifi, WifiOff, AlertTriangle, CheckCircle } from 'lucide-react'
+// import { Clock, Activity } from 'lucide-react';
 import { connectionMonitor, ConnectionStatus } from '../services/connectionMonitor'
 
 interface ConnectionStatusIndicatorProps {

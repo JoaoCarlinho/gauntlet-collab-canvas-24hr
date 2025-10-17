@@ -5,7 +5,7 @@ export const EnvDebug: React.FC = () => {
   const apiUrl = getApiUrl();
   
   // Only show in development and not during Cypress tests
-  if (import.meta.env.MODE !== 'development' || window.Cypress) {
+  if (import.meta.env.MODE !== 'development' || (window as any).Cypress) {
     return null;
   }
   

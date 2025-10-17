@@ -9,12 +9,12 @@ export const isDevelopmentMode = (): boolean => {
          import.meta.env.VITE_DEBUG_MODE === 'true' ||
          window.location.hostname === 'localhost' ||
          window.location.hostname === '127.0.0.1' ||
-         window.Cypress // Also consider Cypress as development mode
+         (window as any).Cypress // Also consider Cypress as development mode
 }
 
 // Check if we're in testing mode (Cypress)
 export const isTestingMode = (): boolean => {
-  return window.Cypress || 
+  return (window as any).Cypress || 
          import.meta.env.VITE_TESTING_MODE === 'true'
 }
 
