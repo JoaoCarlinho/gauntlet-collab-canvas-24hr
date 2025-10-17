@@ -184,28 +184,136 @@ This document outlines the comprehensive plan to fix the critical issue where ob
 
 ---
 
-## 🧪 **Testing Strategy**
+## 🧪 **Comprehensive Testing Strategy**
 
-### **Unit Tests**
+### **Phase 1: Unit Tests**
 - [ ] **Test 1:** Socket error handling and fallback mechanisms
 - [ ] **Test 2:** REST API fallback functionality
 - [ ] **Test 3:** Optimistic updates and rollback
 - [ ] **Test 4:** State management and synchronization
 - [ ] **Test 5:** Error recovery and retry logic
+- [ ] **Test 6:** Debounce and batch update mechanisms
+- [ ] **Test 7:** Socket event optimization
+- [ ] **Test 8:** Connection monitoring and offline handling
+- [ ] **Test 9:** Performance optimization utilities
 
-### **Integration Tests**
-- [ ] **Test 6:** End-to-end object update flow
-- [ ] **Test 7:** Network failure scenarios
-- [ ] **Test 8:** Concurrent user updates
-- [ ] **Test 9:** Connection drop and recovery
-- [ ] **Test 10:** Performance under load
+### **Phase 2: Integration Tests**
+- [ ] **Test 10:** End-to-end object update flow
+- [ ] **Test 11:** Network failure scenarios
+- [ ] **Test 12:** Concurrent user updates
+- [ ] **Test 13:** Connection drop and recovery
+- [ ] **Test 14:** Performance under load
+- [ ] **Test 15:** State synchronization across users
+- [ ] **Test 16:** Offline mode functionality
+- [ ] **Test 17:** Batch processing and debouncing integration
 
-### **Production Testing**
-- [ ] **Test 11:** Production environment validation
-- [ ] **Test 12:** Real-world network conditions
-- [ ] **Test 13:** User acceptance testing
-- [ ] **Test 14:** Performance monitoring
-- [ ] **Test 15:** Error rate monitoring
+### **Phase 3: E2E Testing with Firebase Authentication**
+
+#### **3.1 Pre-Test Setup Script**
+- [ ] **Test 18:** Create automated Firebase authentication setup
+  - **File:** `scripts/setup-test-auth.sh`
+  - **Purpose:** Automatically configure Firebase authentication for E2E tests
+  - **Features:**
+    - Create test user accounts with proper permissions
+    - Generate authentication tokens for test scenarios
+    - Configure Firebase project settings for testing
+    - Set up test data and canvas permissions
+    - Clean up previous test sessions
+
+#### **3.2 E2E Test Suite with Authentication**
+- [ ] **Test 19:** Authenticated user object manipulation
+  - **File:** `cypress/e2e/authenticated-object-tests.cy.ts`
+  - **Scenarios:**
+    - Create objects as authenticated user
+    - Move objects with proper permissions
+    - Resize objects with user context
+    - Delete objects with ownership validation
+    - Real-time collaboration between authenticated users
+
+- [ ] **Test 20:** Multi-user collaboration scenarios
+  - **File:** `cypress/e2e/multi-user-collaboration.cy.ts`
+  - **Scenarios:**
+    - Multiple authenticated users on same canvas
+    - Real-time cursor tracking and presence
+    - Conflict resolution between users
+    - State synchronization across users
+    - Permission-based object access
+
+- [ ] **Test 21:** Error handling with authentication
+  - **File:** `cypress/e2e/auth-error-scenarios.cy.ts`
+  - **Scenarios:**
+    - Token expiration during operations
+    - Permission denied scenarios
+    - Network failures with authenticated users
+    - Reconnection with valid authentication
+    - Fallback mechanisms with user context
+
+#### **3.3 Screenshot and Documentation Generation**
+- [ ] **Test 22:** Automated screenshot generation
+  - **File:** `cypress/e2e/screenshot-generation.cy.ts`
+  - **Purpose:** Generate comprehensive screenshots for documentation
+  - **Features:**
+    - Screenshot all object types and interactions
+    - Capture error states and recovery flows
+    - Document user interface components
+    - Generate visual test reports
+    - Create user guide illustrations
+
+### **Phase 4: Pre-Push Validation Pipeline**
+
+#### **4.1 Pre-Push Hook Script**
+- [ ] **Test 23:** Create pre-push validation script
+  - **File:** `.git/hooks/pre-push` or `scripts/pre-push-validation.sh`
+  - **Purpose:** Run comprehensive tests before every push to origin
+  - **Features:**
+    - Execute Firebase authentication setup
+    - Run full E2E test suite with authentication
+    - Generate screenshots and documentation
+    - Validate all object manipulation scenarios
+    - Check performance metrics and error rates
+    - Block push if any critical tests fail
+
+#### **4.2 Automated Test Reporting**
+- [ ] **Test 24:** Create test report generation
+  - **File:** `scripts/generate-test-report.sh`
+  - **Purpose:** Generate comprehensive test reports
+  - **Features:**
+    - HTML test reports with screenshots
+    - Performance metrics and benchmarks
+    - Error rate analysis and trends
+    - User experience validation results
+    - Documentation updates with new screenshots
+
+### **Phase 5: Production Testing**
+- [ ] **Test 25:** Production environment validation
+- [ ] **Test 26:** Real-world network conditions
+- [ ] **Test 27:** User acceptance testing
+- [ ] **Test 28:** Performance monitoring
+- [ ] **Test 29:** Error rate monitoring
+- [ ] **Test 30:** Firebase authentication in production
+- [ ] **Test 31:** Multi-user production scenarios
+- [ ] **Test 32:** Production screenshot validation
+
+### **Testing Infrastructure Setup**
+
+#### **Required Scripts:**
+- [ ] **Script 1:** `scripts/setup-test-auth.sh` - Firebase authentication setup
+- [ ] **Script 2:** `scripts/run-e2e-with-auth.sh` - E2E tests with authentication
+- [ ] **Script 3:** `scripts/generate-screenshots.sh` - Screenshot generation
+- [ ] **Script 4:** `scripts/pre-push-validation.sh` - Pre-push validation
+- [ ] **Script 5:** `scripts/cleanup-test-data.sh` - Test data cleanup
+
+#### **Configuration Files:**
+- [ ] **Config 1:** `cypress.config.auth.ts` - Cypress config for authenticated tests
+- [ ] **Config 2:** `firebase-test-config.json` - Firebase test configuration
+- [ ] **Config 3:** `test-users.json` - Test user accounts and permissions
+- [ ] **Config 4:** `.env.test` - Test environment variables
+
+#### **Documentation Output:**
+- [ ] **Doc 1:** `docs/e2e-test-results.html` - Interactive test reports
+- [ ] **Doc 2:** `docs/screenshots/` - Comprehensive screenshot library
+- [ ] **Doc 3:** `docs/user-guide-updates.md` - Updated user documentation
+- [ ] **Doc 4:** `docs/performance-metrics.md` - Performance analysis
 
 ---
 

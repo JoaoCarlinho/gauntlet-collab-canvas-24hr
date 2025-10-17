@@ -56,7 +56,17 @@
     "test:enhanced-interactions": "cypress run --spec 'cypress/e2e/enhanced-object-interactions.cy.ts' --config-file cypress.config.local-dev.ts",
     "test:enhanced-interactions:open": "cypress open --spec 'cypress/e2e/enhanced-object-interactions.cy.ts' --config-file cypress.config.local-dev.ts",
     "test:cursor-tooltips": "cypress run --spec 'cypress/e2e/cursor-tooltips.cy.ts' --config-file cypress.config.local-dev.ts",
-    "test:cursor-tooltips:open": "cypress open --spec 'cypress/e2e/cursor-tooltips.cy.ts' --config-file cypress.config.local-dev.ts"
+    "test:cursor-tooltips:open": "cypress open --spec 'cypress/e2e/cursor-tooltips.cy.ts' --config-file cypress.config.local-dev.ts",
+    "test:e2e:auth": "cypress run --config-file cypress.config.auth.ts",
+    "test:e2e:auth:open": "cypress open --config-file cypress.config.auth.ts",
+    "test:screenshots": "cypress run --spec 'cypress/e2e/screenshot-generation.cy.ts' --config-file cypress.config.auth.ts",
+    "test:screenshots:open": "cypress open --spec 'cypress/e2e/screenshot-generation.cy.ts' --config-file cypress.config.auth.ts",
+    "test:auth-objects": "cypress run --spec 'cypress/e2e/authenticated-object-tests.cy.ts' --config-file cypress.config.auth.ts",
+    "test:auth-objects:open": "cypress open --spec 'cypress/e2e/authenticated-object-tests.cy.ts' --config-file cypress.config.auth.ts",
+    "test:multi-user": "cypress run --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts",
+    "test:multi-user:open": "cypress open --spec 'cypress/e2e/multi-user-collaboration.cy.ts' --config-file cypress.config.auth.ts",
+    "test:comprehensive": "npm run test:e2e:auth && npm run test:screenshots",
+    "test:full-suite": "npm run test:comprehensive && npm run test:auth-objects && npm run test:multi-user"
   },
   "dependencies": {
     "react": "^18.2.0",
